@@ -51,20 +51,20 @@ Creates a new kanban board. Only one board can exist at a time — calling this 
 
 **Parameters:**
 
-| Parameter | Type | Required | Description |
-|-----------|------|----------|-------------|
-| `tasks` | `TaskInput[]` | Yes | Array of tasks (1–100 items) |
-| `profileMap` | `Record<string, string>` | No | Override default phase → profile mapping |
+| Parameter    | Type                     | Required | Description                              |
+| ------------ | ------------------------ | -------- | ---------------------------------------- |
+| `tasks`      | `TaskInput[]`            | Yes      | Array of tasks (1–100 items)             |
+| `profileMap` | `Record<string, string>` | No       | Override default phase → profile mapping |
 
 **TaskInput:**
 
-| Field | Type | Required | Description |
-|-------|------|----------|-------------|
-| `title` | `string` | Yes | Short title (max 100 chars) |
-| `description` | `string` | Yes | Detailed description for subagents (max 10,000 chars) |
-| `files` | `string[]` | No | Relevant file paths (max 50 items, 500 chars each) |
-| `phases` | `string[]` | No | Ordered subset of `test`, `implement`, `review`. Default: `["implement"]` |
-| `blockedBy` | `string[]` | No | Task IDs or titles this task depends on (max 20 items). Titles are resolved to IDs at board creation time. |
+| Field         | Type       | Required | Description                                                                                                |
+| ------------- | ---------- | -------- | ---------------------------------------------------------------------------------------------------------- |
+| `title`       | `string`   | Yes      | Short title (max 100 chars)                                                                                |
+| `description` | `string`   | Yes      | Detailed description for subagents (max 10,000 chars)                                                      |
+| `files`       | `string[]` | No       | Relevant file paths (max 50 items, 500 chars each)                                                         |
+| `phases`      | `string[]` | No       | Ordered subset of `test`, `implement`, `review`. Default: `["implement"]`                                  |
+| `blockedBy`   | `string[]` | No       | Task IDs or titles this task depends on (max 20 items). Titles are resolved to IDs at board creation time. |
 
 Task IDs are auto-assigned in creation order as `kb-1`, `kb-2`, `kb-3`, etc. The `blockedBy` field accepts either IDs (e.g. `kb-3`) or titles (e.g. `"Set up database schema"`). Titles are resolved to IDs when the board is created.
 
@@ -120,9 +120,9 @@ Claims up to `count` new ready tasks from the board, respecting the `maxClaims` 
 
 **Parameters:**
 
-| Parameter | Type | Required | Description |
-|-----------|------|----------|-------------|
-| `count` | `integer` | Yes | Number of new tasks to claim (min 1) |
+| Parameter | Type      | Required | Description                          |
+| --------- | --------- | -------- | ------------------------------------ |
+| `count`   | `integer` | Yes      | Number of new tasks to claim (min 1) |
 
 The number of newly claimed tasks is the minimum of `count`, the number of ready tasks, and remaining capacity (`maxClaims` minus outstanding). The requested `count` refers only to new claims — outstanding tasks are always returned regardless.
 
@@ -145,9 +145,9 @@ Advances one or more claimed tasks to their next phase. Tasks stay claimed throu
 
 **Parameters:**
 
-| Parameter | Type | Required | Description |
-|-----------|------|----------|-------------|
-| `ids` | `string[]` | Yes | Task IDs to advance (1–50 items) |
+| Parameter | Type       | Required | Description                      |
+| --------- | ---------- | -------- | -------------------------------- |
+| `ids`     | `string[]` | Yes      | Task IDs to advance (1–50 items) |
 
 All IDs are validated atomically — if any ID is invalid or not currently claimed, no tasks are advanced.
 
@@ -163,6 +163,7 @@ All IDs are validated atomically — if any ID is invalid or not currently claim
 ```
 
 **Behavior per task:**
+
 - `currentPhaseIndex` increments by 1
 - If `currentPhaseIndex >= phases.length` → task is marked `done`
 - Otherwise → task stays `claimed` at the next phase (no need to re-claim)
@@ -174,10 +175,10 @@ Rejects one or more claimed tasks, resetting them to phase 0 while keeping them 
 
 **Parameters:**
 
-| Parameter | Type | Required | Description |
-|-----------|------|----------|-------------|
-| `ids` | `string[]` | Yes | Task IDs to reject (1–50 items) |
-| `reason` | `string` | No | Reason for rejection |
+| Parameter | Type       | Required | Description                     |
+| --------- | ---------- | -------- | ------------------------------- |
+| `ids`     | `string[]` | Yes      | Task IDs to reject (1–50 items) |
+| `reason`  | `string`   | No       | Reason for rejection            |
 
 All IDs are validated atomically. If any ID is invalid or not currently claimed, no tasks are rejected.
 
@@ -215,10 +216,10 @@ Both use the `kanban` key:
 }
 ```
 
-| Setting | Type | Default | Description |
-|---------|------|---------|-------------|
+| Setting      | Type                     | Default                                                                            | Description                                                                   |
+| ------------ | ------------------------ | ---------------------------------------------------------------------------------- | ----------------------------------------------------------------------------- |
 | `profileMap` | `Record<string, string>` | `{ test: "task-worker-tests", implement: "task-worker", review: "task-reviewer" }` | Maps phase names to subagent profile names. Always merged on top of defaults. |
-| `maxClaims` | `integer` | `4` | Maximum concurrent claimed tasks. Clamped to 1–10. |
+| `maxClaims`  | `integer`                | `4`                                                                                | Maximum concurrent claimed tasks. Clamped to 1–10.                            |
 
 The `profileMap` can also be overridden per-board via the `profileMap` parameter in `create_kanban`. Merge order is: defaults → global settings → project settings → per-board parameter.
 
@@ -268,9 +269,23 @@ A typical agent workflow:
   "tool": "create_kanban",
   "parameters": {
     "tasks": [
-      { "title": "Design API schema", "description": "Define REST endpoints and data models...", "phases": ["implement", "review"] },
-      { "title": "Implement endpoints", "description": "Build the route handlers...", "phases": ["test", "implement", "review"], "blockedBy": ["Design API schema"] },
-      { "title": "Write integration tests", "description": "End-to-end tests for all routes...", "phases": ["implement"], "blockedBy": ["Implement endpoints"] }
+      {
+        "title": "Design API schema",
+        "description": "Define REST endpoints and data models...",
+        "phases": ["implement", "review"]
+      },
+      {
+        "title": "Implement endpoints",
+        "description": "Build the route handlers...",
+        "phases": ["test", "implement", "review"],
+        "blockedBy": ["Design API schema"]
+      },
+      {
+        "title": "Write integration tests",
+        "description": "End-to-end tests for all routes...",
+        "phases": ["implement"],
+        "blockedBy": ["Implement endpoints"]
+      }
     ]
   }
 }

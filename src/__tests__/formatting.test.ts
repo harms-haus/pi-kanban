@@ -103,8 +103,6 @@ describe("formatTaskText", () => {
     const expectedIcon = STATUS_ICONS["claimed"];
     expect(result).toBe(`${expectedIcon} [a1b2c3d4] Claimed task (implement, claimed)`);
   });
-
-
 });
 
 // ── formatBoardText ──────────────────────────────────────────────────

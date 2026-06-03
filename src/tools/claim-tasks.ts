@@ -54,11 +54,7 @@ export function createClaimTasksTool(): ToolDefinition<typeof ClaimTasksParams, 
       const maxClaims = board.maxClaims;
       const remaining = maxClaims - outstanding.length;
 
-      const newlyClaimedCount = Math.min(
-        params.count,
-        ready.length,
-        Math.max(0, remaining),
-      );
+      const newlyClaimedCount = Math.min(params.count, ready.length, Math.max(0, remaining));
       const newlyClaimed: typeof outstanding = [];
 
       // Take first newlyClaimedCount ready tasks, set status and confirm profile

@@ -83,7 +83,6 @@ export function createRejectTasksTool(): ToolDefinition<RejectTasksParamsType, K
           errors.push(`task "${id}" is not claimed (current status: ${task.status})`);
           continue;
         }
-
       }
 
       if (errors.length > 0) {
