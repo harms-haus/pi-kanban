@@ -114,6 +114,31 @@ Lists all tasks on the current board, grouped by status: claimed → ready → b
 
 Returns the full board text or `"No board exists. Use create_kanban to create one."` if no board is active.
 
+**Output format:**
+
+Each line follows the pattern `{status_icon} {phase_icon} [{id}] {title} → {deps}`:
+
+| Element        | Meaning                                                                 |
+| -------------- | ----------------------------------------------------------------------- |
+| Status icon    | `⊘` blocked, `○` ready, `●` claimed, `✓` done                           |
+| Phase icon     | `🧪` test, `⚙️` implement, `👁` review, `✓` done                       |
+| Dependencies   | `→` followed by comma-separated blocker task IDs (omitted if none)      |
+
+**Example output:**
+
+```
+📋 Kanban Board — 3 total, 1 claimed, 1 ready, 0 blocked, 1 done
+
+── CLAIMED ──
+● ⚙️ [kb-2] Implement endpoints → kb-1
+
+── READY ──
+○ 🧪 [kb-3] Write integration tests → kb-2
+
+── DONE ──
+✓ ✓ [kb-1] Design API schema
+```
+
 ### `claim_tasks`
 
 Claims up to `count` new ready tasks from the board, respecting the `maxClaims` limit. Always returns all currently outstanding (already claimed) tasks alongside any newly claimed ones.
@@ -341,3 +366,30 @@ On `session_start` and `session_tree` events, the extension scans the session br
 - Board state survives agent restarts
 - Branching and switching between session tree nodes preserves the correct board state for each branch
 - No external state files are needed — everything is derived from the session history
+
+## Powerline UI Integration
+
+The extension publishes real-time board status to the TUI after every board mutation (create, claim, advance, reject). This status is consumed by **pi-powerline** to display an at-a-glance view of the board above the composer.
+
+The powerline display shows:
+
+- **Claimed tasks** with their current phase icon, listed individually
+- **Summary line** in the format `[done/total] N claimed, N ready, N blocked`, positioned closest to the composer
+
+No configuration is required — the integration activates automatically when both pi-kanban and pi-powerline are installed.
+
+**Published payload** (`ctx.ui.setStatus("kanban", ...)`):
+
+```json
+{
+  "total": 5,
+  "claimed": 2,
+  "ready": 1,
+  "blocked": 1,
+  "done": 1,
+  "claimedTasks": [
+    { "id": "kb-2", "title": "Implement endpoints", "phase": "implement" },
+    { "id": "kb-3", "title": "Write tests", "phase": "test" }
+  ]
+}
+```

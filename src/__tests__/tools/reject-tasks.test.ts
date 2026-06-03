@@ -1,4 +1,5 @@
 import { describe, it, expect, beforeEach } from "vitest";
+import type { Mock } from "vitest";
 import { createRejectTasksTool } from "../../tools/reject-tasks";
 import { resetState, getBoard } from "../../state";
 import { createMockContext } from "../helpers/mock-api";
@@ -170,6 +171,28 @@ describe("reject_tasks tool", () => {
       type: "text",
       text: expect.stringContaining("No board exists"),
     });
+  });
+
+  it("publishes kanban status to UI on success", async () => {
+    const ctxWithUI = createMockContext({ hasUI: true });
+    const t1 = makeTask({
+      title: "Task A",
+      phases: ["implement", "review"],
+      currentPhaseIndex: 1,
+      status: "claimed",
+      profile: "task-reviewer",
+    });
+    setupBoard([t1]);
+
+    await tool.execute("call-1", { ids: [t1.id] }, mockSignal, noop, ctxWithUI);
+
+    expect(ctxWithUI.ui.setStatus).toHaveBeenCalledOnce();
+    expect(ctxWithUI.ui.setStatus).toHaveBeenCalledWith("kanban", expect.any(String));
+
+    const payload = JSON.parse((ctxWithUI.ui.setStatus as Mock).mock.calls[0]![1] as string);
+    expect(payload.total).toBe(1);
+    expect(payload.claimed).toBe(1);
+    expect(payload.claimedTasks[0]!.phase).toBe("implement");
   });
 
   it("details contain board snapshot on success", async () => {

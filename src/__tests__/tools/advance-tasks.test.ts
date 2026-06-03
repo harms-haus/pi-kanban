@@ -1,4 +1,5 @@
 import { describe, it, expect, beforeEach } from "vitest";
+import type { Mock } from "vitest";
 import { createAdvanceTasksTool } from "../../tools/advance-tasks";
 import { resetState, getBoard } from "../../state";
 import { createMockContext } from "../helpers/mock-api";
@@ -155,6 +156,27 @@ describe("advance_tasks tool", () => {
     const board = getBoard()!;
     // Should only advance once (deduplicated)
     expect(board.tasks[0]!.currentPhaseIndex).toBe(1);
+  });
+
+  it("publishes kanban status to UI on success", async () => {
+    const ctxWithUI = createMockContext({ hasUI: true });
+    const t1 = makeTask({
+      title: "Task A",
+      phases: ["implement"],
+      currentPhaseIndex: 0,
+      status: "claimed",
+      profile: "task-worker",
+    });
+    setupBoard([t1]);
+
+    await tool.execute("call-1", { ids: [t1.id] }, mockSignal, noop, ctxWithUI);
+
+    expect(ctxWithUI.ui.setStatus).toHaveBeenCalledOnce();
+    expect(ctxWithUI.ui.setStatus).toHaveBeenCalledWith("kanban", expect.any(String));
+
+    const payload = JSON.parse((ctxWithUI.ui.setStatus as Mock).mock.calls[0]![1] as string);
+    expect(payload.total).toBe(1);
+    expect(payload.done).toBe(1);
   });
 
   it("details contain board snapshot", async () => {

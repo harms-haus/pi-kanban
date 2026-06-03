@@ -12,6 +12,7 @@ import { MAX_IDS_IN_CALL, type KanbanBoard, type KanbanDetails } from "../types"
 import { getBoard, getTaskById, resolveTaskProfile } from "../state";
 import { cloneBoard } from "../validation";
 import { formatTaskText, formatBoardText, renderToolResult } from "../formatting";
+import { publishKanbanStatus } from "../status";
 
 // ── Schema ──
 
@@ -59,7 +60,7 @@ export function createRejectTasksTool(): ToolDefinition<RejectTasksParamsType, K
       params,
       _signal,
       _onUpdate,
-      _ctx,
+      ctx,
     ): Promise<AgentToolResult<KanbanDetails>> {
       // 1. Board must exist
       const board = getBoard();
@@ -99,7 +100,10 @@ export function createRejectTasksTool(): ToolDefinition<RejectTasksParamsType, K
         task.reason = params.reason ?? undefined;
       }
 
-      // 5. Build content: per-task rejection info + board summary
+      // 5. Publish status to UI
+      publishKanbanStatus(board, ctx);
+
+      // 6. Build content: per-task rejection info + board summary
       const lines: string[] = [];
       for (const id of uniqueIds) {
         // eslint-disable-next-line @typescript-eslint/no-non-null-assertion

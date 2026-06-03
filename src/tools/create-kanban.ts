@@ -20,6 +20,7 @@ import {
 import { validatePhases, detectCycles, cloneBoard } from "../validation";
 import { loadSettings } from "../settings";
 import { formatBoardText, renderToolResult } from "../formatting";
+import { publishKanbanStatus } from "../status";
 
 // ── Schema ──
 
@@ -155,6 +156,9 @@ async function executeCreateKanban(
 
   // 10. Persist board
   setBoard(board);
+
+  // 11. Publish status to UI
+  publishKanbanStatus(board, ctx);
 
   return {
     content: [

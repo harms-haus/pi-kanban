@@ -6,6 +6,7 @@ import { MAX_IDS_IN_CALL } from "../types";
 import { getBoard, getTaskById, unblockDependents, resolveTaskProfile } from "../state";
 import { cloneBoard } from "../validation";
 import { formatBoardText, renderToolResult } from "../formatting";
+import { publishKanbanStatus } from "../status";
 
 // ── Schema Builder ──
 
@@ -49,7 +50,7 @@ export function createAdvanceTasksTool(): ToolDefinition<
       executeParams: { ids: string[] },
       _signal: AbortSignal | undefined,
       _onUpdate: unknown,
-      _ctx: ExtensionContext,
+      ctx: ExtensionContext,
     ) {
       const board = getBoard();
       if (!board) {
@@ -108,6 +109,9 @@ export function createAdvanceTasksTool(): ToolDefinition<
           unblockDependents(task.id);
         }
       }
+
+      // Publish status to UI
+      publishKanbanStatus(board, ctx);
 
       // ── Build Content ──
       const lines: string[] = [];

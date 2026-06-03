@@ -24,13 +24,14 @@ export function formatPhaseLabel(task: Task): string {
 /**
  * Formats a single task as plain text.
  *
- * Format: `{icon} [{id}] {title} ({phase}, {status})`
+ * Format: `{status_icon} {phase_icon} [{id}] {title} → {deps}` (deps optional)
  */
 export function formatTaskText(task: Task): string {
   const icon = STATUS_ICONS[task.status];
-  const shortId = task.id;
-  const phase = formatPhaseLabel(task);
-  return `${icon} [${shortId}] ${task.title} (${phase}, ${task.status})`;
+  const phaseLabel = formatPhaseLabel(task);
+  const phaseIcon = PHASE_ICONS[phaseLabel] ?? "?";
+  const deps = task.blockedBy.length > 0 ? ` → ${task.blockedBy.join(", ")}` : "";
+  return `${icon} ${phaseIcon} [${task.id}] ${task.title}${deps}`;
 }
 
 /**
@@ -165,8 +166,11 @@ export function renderBoard(board: KanbanBoard, theme: Theme): string {
           ? theme.fg("dim", theme.strikethrough(task.title))
           : theme.fg("text", task.title);
 
+      const depsStyled =
+        task.blockedBy.length > 0 ? theme.fg("muted", ` → ${task.blockedBy.join(", ")}`) : "";
+
       lines.push(
-        `${icon} ${theme.fg("accent", `[${shortId}]`)} ${title} ${theme.fg("muted", `(${phaseIcon} ${phaseLabel})`)}`,
+        `${icon} ${phaseIcon} ${theme.fg("accent", `[${shortId}]`)} ${title}${depsStyled}`,
       );
     }
   }

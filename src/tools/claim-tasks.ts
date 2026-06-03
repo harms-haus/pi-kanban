@@ -11,6 +11,7 @@ import type { KanbanDetails } from "../types";
 import { getBoard, getTasksByStatus, resolveTaskProfile } from "../state";
 import { cloneBoard } from "../validation";
 import { formatClaimTaskDetail, formatBoardText, renderToolResult } from "../formatting";
+import { publishKanbanStatus } from "../status";
 
 // ── Schema ──
 
@@ -42,7 +43,7 @@ export function createClaimTasksTool(): ToolDefinition<typeof ClaimTasksParams, 
       params: { count: number },
       _signal: AbortSignal | undefined,
       _onUpdate: undefined,
-      _ctx: ExtensionContext,
+      ctx: ExtensionContext,
     ) {
       const board = getBoard();
       if (!board) {
@@ -95,6 +96,9 @@ export function createClaimTasksTool(): ToolDefinition<typeof ClaimTasksParams, 
 
         text = parts.join("\n");
       }
+
+      // Publish status to UI
+      publishKanbanStatus(board, ctx);
 
       return {
         content: [{ type: "text" as const, text }],

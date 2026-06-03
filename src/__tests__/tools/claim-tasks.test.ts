@@ -1,4 +1,5 @@
 import { describe, it, expect, beforeEach } from "vitest";
+import type { Mock } from "vitest";
 import { createClaimTasksTool } from "../../tools/claim-tasks";
 import { resetState, getBoard } from "../../state";
 import { createMockContext } from "../helpers/mock-api";
@@ -169,6 +170,23 @@ describe("claim_tasks tool", () => {
     const board = getBoard()!;
     const claimed = board.tasks.filter((t) => t.status === "claimed");
     expect(claimed).toHaveLength(7);
+  });
+
+  it("publishes kanban status to UI on success", async () => {
+    const ctxWithUI = createMockContext({ hasUI: true });
+    const t1 = makeTask({ title: "Ready A", status: "ready" });
+    const t2 = makeTask({ title: "Ready B", status: "ready" });
+    setupBoard([t1, t2]);
+
+    await tool.execute("call-1", { count: 1 }, mockSignal, noop, ctxWithUI);
+
+    expect(ctxWithUI.ui.setStatus).toHaveBeenCalledOnce();
+    expect(ctxWithUI.ui.setStatus).toHaveBeenCalledWith("kanban", expect.any(String));
+
+    const payload = JSON.parse((ctxWithUI.ui.setStatus as Mock).mock.calls[0]![1] as string);
+    expect(payload.total).toBe(2);
+    expect(payload.claimed).toBe(1);
+    expect(payload.ready).toBe(1);
   });
 
   it("details contain board snapshot", async () => {

@@ -1,4 +1,5 @@
 import { describe, it, expect, beforeEach } from "vitest";
+import type { Mock } from "vitest";
 import { createKanbanTool } from "../../tools/create-kanban";
 import { resetState, getBoard } from "../../state";
 import { createMockContext } from "../helpers/mock-api";
@@ -247,6 +248,46 @@ describe("create_kanban tool", () => {
     // The task starts at phase "implement" so profile should use custom map
     expect(board.tasks[0]!.profile).toBe("custom-worker");
     expect(board.profileMap.implement).toBe("custom-worker");
+  });
+
+  it("publishes kanban status to UI on success", async () => {
+    const ctxWithUI = createMockContext({ hasUI: true });
+
+    await tool.execute(
+      "call-1",
+      {
+        tasks: [
+          { title: "Task A", description: "First" },
+          { title: "Task B", description: "Second" },
+        ],
+      },
+      mockSignal,
+      noop,
+      ctxWithUI,
+    );
+
+    expect(ctxWithUI.ui.setStatus).toHaveBeenCalledOnce();
+    expect(ctxWithUI.ui.setStatus).toHaveBeenCalledWith("kanban", expect.any(String));
+
+    const payload = JSON.parse((ctxWithUI.ui.setStatus as Mock).mock.calls[0]![1] as string);
+    expect(payload.total).toBe(2);
+    expect(payload.ready).toBe(2);
+    expect(payload.claimed).toBe(0);
+    expect(payload.blocked).toBe(0);
+    expect(payload.done).toBe(0);
+    expect(payload.claimedTasks).toEqual([]);
+  });
+
+  it("does not publish status when hasUI is false", async () => {
+    await tool.execute(
+      "call-1",
+      { tasks: [{ title: "Task A", description: "First" }] },
+      mockSignal,
+      noop,
+      mockCtx,
+    );
+
+    expect(mockCtx.ui.setStatus).not.toHaveBeenCalled();
   });
 
   it("details contain full board snapshot", async () => {

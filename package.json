@@ -28,7 +28,9 @@
     "format": "prettier --write src/",
     "format:check": "prettier --check src/",
     "typecheck": "tsc --noEmit",
-    "lint:fix": "eslint --fix src/"
+    "lint:fix": "eslint --fix src/",
+    "pre-commit-check": "npm run format:check && npm run lint && npm run typecheck",
+    "prepare": "simple-git-hooks"
   },
   "peerDependencies": {
     "@earendil-works/pi-ai": "*",
@@ -43,9 +45,13 @@
     "eslint": "^10.4.0",
     "eslint-config-prettier": "^10.1.8",
     "prettier": "^3.8.3",
+    "simple-git-hooks": "^2.13.1",
     "typescript": "^6.0.3",
     "typescript-eslint": "^8.59.3",
     "vitest": "^4.1.6"
+  },
+  "simple-git-hooks": {
+    "pre-commit": "npm run pre-commit-check"
   },
   "author": "harms-haus",
   "engines": {

@@ -57,7 +57,7 @@ describe("formatPhaseLabel", () => {
 // ── formatTaskText ───────────────────────────────────────────────────
 
 describe("formatTaskText", () => {
-  it("formats a task with correct icon, short ID, title, phase, and status", () => {
+  it("formats a ready task with status icon, phase icon, id, and title", () => {
     const task = makeTask({
       id: "kb-1",
       title: "My task",
@@ -66,11 +66,10 @@ describe("formatTaskText", () => {
       status: "ready",
     });
     const result = formatTaskText(task);
-    const expectedIcon = STATUS_ICONS["ready"];
-    expect(result).toBe(`${expectedIcon} [kb-1] My task (implement, ready)`);
+    expect(result).toBe(`${STATUS_ICONS.ready} ${PHASE_ICONS.implement} [kb-1] My task`);
   });
 
-  it("formats a done task correctly", () => {
+  it("formats a done task with done phase icon", () => {
     const task = makeTask({
       id: "kb-2",
       title: "Done task",
@@ -78,30 +77,50 @@ describe("formatTaskText", () => {
       status: "done",
     });
     const result = formatTaskText(task);
-    const expectedIcon = STATUS_ICONS["done"];
-    expect(result).toBe(`${expectedIcon} [kb-2] Done task (done, done)`);
+    expect(result).toBe(`${STATUS_ICONS.done} ${PHASE_ICONS.done} [kb-2] Done task`);
   });
 
-  it("formats a blocked task correctly", () => {
+  it("formats a blocked task with phase icon", () => {
     const task = makeTask({
       id: "aabbccdd",
       title: "Blocked task",
       status: "blocked",
     });
     const result = formatTaskText(task);
-    const expectedIcon = STATUS_ICONS["blocked"];
-    expect(result).toBe(`${expectedIcon} [aabbccdd] Blocked task (implement, blocked)`);
+    expect(result).toBe(`${STATUS_ICONS.blocked} ${PHASE_ICONS.implement} [aabbccdd] Blocked task`);
   });
 
-  it("formats a claimed task correctly", () => {
+  it("formats a claimed task with phase icon", () => {
     const task = makeTask({
       id: "a1b2c3d4",
       title: "Claimed task",
       status: "claimed",
     });
     const result = formatTaskText(task);
-    const expectedIcon = STATUS_ICONS["claimed"];
-    expect(result).toBe(`${expectedIcon} [a1b2c3d4] Claimed task (implement, claimed)`);
+    expect(result).toBe(`${STATUS_ICONS.claimed} ${PHASE_ICONS.implement} [a1b2c3d4] Claimed task`);
+  });
+
+  it("appends dependency suffix when blockedBy is non-empty", () => {
+    const task = makeTask({
+      id: "kb-5",
+      title: "Dependent task",
+      status: "blocked",
+      blockedBy: ["kb-99", "kb-42"],
+    });
+    const result = formatTaskText(task);
+    expect(result).toBe(
+      `${STATUS_ICONS.blocked} ${PHASE_ICONS.implement} [kb-5] Dependent task → kb-99, kb-42`,
+    );
+  });
+
+  it("does not include dependency arrow when blockedBy is empty", () => {
+    const task = makeTask({
+      id: "kb-6",
+      title: "No deps",
+      blockedBy: [],
+    });
+    const result = formatTaskText(task);
+    expect(result).not.toContain("→");
   });
 });
 
@@ -163,7 +182,19 @@ describe("formatBoardText", () => {
     const result = formatBoardText(board);
 
     expect(result).toContain("Ready task");
-    expect(result).toContain("(implement, ready)");
+    expect(result).toContain(PHASE_ICONS.implement);
+  });
+
+  it("includes dependency arrow for blocked tasks with blockedBy", () => {
+    const blocked = makeTask({
+      id: "b1",
+      status: "blocked",
+      blockedBy: ["kb-10", "kb-20"],
+    });
+    const board = makeBoard([blocked]);
+    const result = formatBoardText(board);
+
+    expect(result).toContain("→ kb-10, kb-20");
   });
 });
 
@@ -289,6 +320,7 @@ describe("renderBoard", () => {
     renderBoard(makeBoard([task]), mockTheme);
 
     expect(mockTheme.fg).toHaveBeenCalledWith("success", STATUS_ICONS.ready);
+    expect(mockTheme.fg).toHaveBeenCalledWith("text", PHASE_ICONS.implement);
     expect(mockTheme.fg).toHaveBeenCalledWith("accent", "[task-1]");
     expect(mockTheme.fg).toHaveBeenCalledWith("text", "Test task");
   });
@@ -300,6 +332,25 @@ describe("renderBoard", () => {
     expect(mockTheme.strikethrough).toHaveBeenCalledWith("Done task");
     // Mock strikethrough is passthrough, so fg receives the plain text
     expect(mockTheme.fg).toHaveBeenCalledWith("dim", "Done task");
+  });
+
+  it("renders both status and phase icons for done tasks", () => {
+    const task = makeTask({ id: "d1", status: "done", currentPhaseIndex: -1 });
+    renderBoard(makeBoard([task]), mockTheme);
+
+    expect(mockTheme.fg).toHaveBeenCalledWith("dim", STATUS_ICONS.done);
+    expect(mockTheme.fg).toHaveBeenCalledWith("text", PHASE_ICONS.done);
+  });
+
+  it("renders dependency suffix for blocked tasks with blockedBy", () => {
+    const task = makeTask({
+      id: "b1",
+      status: "blocked",
+      blockedBy: ["kb-10", "kb-20"],
+    });
+    renderBoard(makeBoard([task]), mockTheme);
+
+    expect(mockTheme.fg).toHaveBeenCalledWith("muted", " → kb-10, kb-20");
   });
 });
 
