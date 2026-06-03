@@ -20,7 +20,6 @@ import {
 import { validatePhases, detectCycles, cloneBoard } from "../validation";
 import { loadSettings } from "../settings";
 import { formatBoardText, renderToolResult } from "../formatting";
-import { randomUUID } from "node:crypto";
 
 // ── Schema ──
 
@@ -112,7 +111,7 @@ async function executeCreateKanban(
     }
 
     const task: Task = {
-      id: randomUUID(),
+      id: `kb-${tasks.length + 1}`,
       title: inputTask.title,
       description: inputTask.description,
       files: inputTask.files ?? [],
@@ -175,11 +174,11 @@ export function createKanbanTool(): ToolDefinition<typeof CreateKanbanParams, Ka
     name: "create_kanban",
     label: "Create Kanban Board",
     description:
-      "Create a kanban board with tasks organized by phases (test, implement, review) with dependency tracking. Each task goes through its phases in order, and tasks blocked by others wait until their dependencies are done. The board replaces any existing board — there can only be one at a time.",
+      "Create a kanban board with tasks organized by phases (test, implement, review) with dependency tracking. Each task goes through its phases in order, and tasks blocked by others wait until their dependencies are done. There can only be one board at a time — calling this when a board already exists throws an error.",
     parameters: CreateKanbanParams,
     promptSnippet: "Create a kanban board with tasks, phases, and dependency tracking",
     promptGuidelines: [
-      "Use create_kanban to create a new board when starting a new task plan. This replaces any existing board.",
+      "Use create_kanban to create a new board when starting a new task plan. Only one board can exist at a time — calling this when a board already exists throws an error.",
       "Each task has a short title and a fully detailed description for subagents.",
       "Set phases for each task (default: implement). Use multiple phases (test, implement, review) for complex tasks.",
       "Use blockedBy to express dependencies between tasks. Tasks without blockers start as ready.",

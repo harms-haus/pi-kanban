@@ -31,7 +31,7 @@ describe("advance_tasks tool", () => {
 
     const board = getBoard()!;
     expect(board.tasks[0]!.currentPhaseIndex).toBe(1);
-    expect(board.tasks[0]!.status).toBe("ready");
+    expect(board.tasks[0]!.status).toBe("claimed");
   });
 
   it("task reaching final phase → done", async () => {

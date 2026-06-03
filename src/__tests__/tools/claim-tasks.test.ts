@@ -92,7 +92,7 @@ describe("claim_tasks tool", () => {
 
   it("returns full task details", async () => {
     const t1 = makeTask({
-      id: "aaaaaaaa-0000-0000-0000-000000000001",
+      id: "kb-detail",
       title: "Detailed Task",
       description: "A very detailed description",
       files: ["src/foo.ts", "src/bar.ts"],
@@ -127,6 +127,48 @@ describe("claim_tasks tool", () => {
     await expect(tool.execute("call-1", { count: 1 }, mockSignal, noop, mockCtx)).rejects.toThrow(
       "No board exists",
     );
+  });
+
+  it("claims new tasks even when outstanding count >= requested count", async () => {
+    const t1 = makeTask({ title: "Claimed 1", status: "claimed" });
+    const t2 = makeTask({ title: "Claimed 2", status: "claimed" });
+    const t3 = makeTask({ title: "Claimed 3", status: "claimed" });
+    const t4 = makeTask({ title: "Ready A", status: "ready" });
+    const t5 = makeTask({ title: "Ready B", status: "ready" });
+    setupBoard([t1, t2, t3, t4, t5], { maxClaims: 5 });
+
+    const result = await tool.execute("call-1", { count: 1 }, mockSignal, noop, mockCtx);
+
+    expect(result.content[0]).toMatchObject({
+      type: "text",
+      text: expect.stringContaining("Claimed 1 task(s)"),
+    });
+
+    const board = getBoard()!;
+    const claimed = board.tasks.filter((t) => t.status === "claimed");
+    expect(claimed).toHaveLength(4);
+  });
+
+  it("returns all claimed tasks even when requesting fewer", async () => {
+    const claimedTasks = Array.from({ length: 5 }, (_, i) =>
+      makeTask({ title: `Claimed ${i + 1}`, status: "claimed" }),
+    );
+    const t6 = makeTask({ title: "Ready A", status: "ready" });
+    const t7 = makeTask({ title: "Ready B", status: "ready" });
+    setupBoard([...claimedTasks, t6, t7], { maxClaims: 10 });
+
+    const result = await tool.execute("call-1", { count: 2 }, mockSignal, noop, mockCtx);
+
+    const text = result.content[0]!.type === "text" ? result.content[0]!.text : "";
+    for (let i = 1; i <= 5; i++) {
+      expect(text).toContain(`Claimed ${i}`);
+    }
+    expect(text).toContain("Ready A");
+    expect(text).toContain("Ready B");
+
+    const board = getBoard()!;
+    const claimed = board.tasks.filter((t) => t.status === "claimed");
+    expect(claimed).toHaveLength(7);
   });
 
   it("details contain board snapshot", async () => {

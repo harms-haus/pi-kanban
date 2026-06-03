@@ -104,22 +104,22 @@ describe("getTasksByStatus", () => {
 
 describe("resolveBlockedByTitles", () => {
   it("resolves title references to IDs", () => {
-    const taskA = makeTask({ id: "00000000-0000-0000-0000-000000000001", title: "Setup database" });
+    const taskA = makeTask({ id: "kb-1", title: "Setup database" });
     const taskB = makeTask({
-      id: "00000000-0000-0000-0000-000000000002",
+      id: "kb-2",
       title: "Write queries",
       blockedBy: ["Setup database"],
     });
 
     const result = resolveBlockedByTitles([taskA, taskB]);
     expect(result).toEqual({ success: true });
-    expect(taskB.blockedBy).toEqual(["00000000-0000-0000-0000-000000000001"]);
+    expect(taskB.blockedBy).toEqual(["kb-1"]);
   });
 
   it("returns error for unresolvable references", () => {
-    const taskA = makeTask({ id: "00000000-0000-0000-0000-000000000001", title: "Setup database" });
+    const taskA = makeTask({ id: "kb-1", title: "Setup database" });
     const taskB = makeTask({
-      id: "00000000-0000-0000-0000-000000000002",
+      id: "kb-2",
       title: "Write queries",
       blockedBy: ["Nonexistent task"],
     });
@@ -132,47 +132,44 @@ describe("resolveBlockedByTitles", () => {
   });
 
   it("leaves already-resolved IDs unchanged", () => {
-    const taskA = makeTask({ id: "00000000-0000-0000-0000-000000000001", title: "Setup database" });
+    const taskA = makeTask({ id: "kb-1", title: "Setup database" });
     const taskB = makeTask({
-      id: "00000000-0000-0000-0000-000000000002",
+      id: "kb-2",
       title: "Write queries",
-      blockedBy: ["00000000-0000-0000-0000-000000000001"],
+      blockedBy: ["kb-1"],
     });
 
     const result = resolveBlockedByTitles([taskA, taskB]);
     expect(result).toEqual({ success: true });
-    expect(taskB.blockedBy).toEqual(["00000000-0000-0000-0000-000000000001"]);
+    expect(taskB.blockedBy).toEqual(["kb-1"]);
   });
 
   it("handles task with empty blockedBy", () => {
-    const task = makeTask({ id: "00000000-0000-0000-0000-000000000001", blockedBy: [] });
+    const task = makeTask({ id: "kb-1", blockedBy: [] });
     const result = resolveBlockedByTitles([task]);
     expect(result).toEqual({ success: true });
     expect(task.blockedBy).toEqual([]);
   });
 
   it("resolves multiple mixed references", () => {
-    const taskA = makeTask({ id: "00000000-0000-0000-0000-000000000001", title: "Task A" });
-    const taskB = makeTask({ id: "00000000-0000-0000-0000-000000000002", title: "Task B" });
+    const taskA = makeTask({ id: "kb-1", title: "Task A" });
+    const taskB = makeTask({ id: "kb-2", title: "Task B" });
     const taskC = makeTask({
-      id: "00000000-0000-0000-0000-000000000003",
+      id: "kb-3",
       title: "Task C",
-      blockedBy: ["Task A", "00000000-0000-0000-0000-000000000002"],
+      blockedBy: ["Task A", "kb-2"],
     });
 
     const result = resolveBlockedByTitles([taskA, taskB, taskC]);
     expect(result).toEqual({ success: true });
-    expect(taskC.blockedBy).toEqual([
-      "00000000-0000-0000-0000-000000000001",
-      "00000000-0000-0000-0000-000000000002",
-    ]);
+    expect(taskC.blockedBy).toEqual(["kb-1", "kb-2"]);
   });
 
-  it("does not treat a non-UUID non-title string as resolved", () => {
-    const taskA = makeTask({ id: "00000000-0000-0000-0000-000000000001", title: "Task A" });
+  it("does not treat a non-kb-N non-title string as resolved", () => {
+    const taskA = makeTask({ id: "kb-1", title: "Task A" });
     const taskB = makeTask({
-      id: "00000000-0000-0000-0000-000000000002",
-      blockedBy: ["not-a-uuid-and-not-a-title"],
+      id: "kb-2",
+      blockedBy: ["not-a-kb-id-and-not-a-title"],
     });
 
     const result = resolveBlockedByTitles([taskA, taskB]);

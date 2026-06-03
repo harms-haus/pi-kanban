@@ -78,6 +78,7 @@ describe("create_kanban tool", () => {
     const board = getBoard()!;
     const ids = board.tasks.map((t) => t.id);
     expect(new Set(ids).size).toBe(ids.length);
+    expect(ids).toEqual(["kb-1", "kb-2"]);
   });
 
   it("resolves blockedBy titles to IDs", async () => {
@@ -194,8 +195,8 @@ describe("create_kanban tool", () => {
     // so this validates the detection pathway at the tool level by testing
     // with a board that already has ID-based blockedBy (via the state layer).
     const { detectCycles } = await import("../../validation");
-    const idA = "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa";
-    const idB = "bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb";
+    const idA = "kb-A";
+    const idB = "kb-B";
     const result = detectCycles([
       { id: idA, blockedBy: [idB] },
       { id: idB, blockedBy: [idA] },

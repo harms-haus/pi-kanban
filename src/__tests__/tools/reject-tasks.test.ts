@@ -33,7 +33,7 @@ describe("reject_tasks tool", () => {
     expect(board.tasks[0]!.currentPhaseIndex).toBe(0);
   });
 
-  it("updates profile and sets status to ready", async () => {
+  it("updates profile and keeps status as claimed", async () => {
     const t1 = makeTask({
       title: "Task A",
       phases: ["implement", "review"],
@@ -46,7 +46,7 @@ describe("reject_tasks tool", () => {
     await tool.execute("call-1", { ids: [t1.id] }, mockSignal, noop, mockCtx);
 
     const board = getBoard()!;
-    expect(board.tasks[0]!.status).toBe("ready");
+    expect(board.tasks[0]!.status).toBe("claimed");
     expect(board.tasks[0]!.profile).toBe("task-worker");
   });
 
@@ -71,7 +71,7 @@ describe("reject_tasks tool", () => {
     expect(board.tasks[0]!.reason).toBe("Needs more tests");
   });
 
-  it("returns error for tasks in first phase", async () => {
+  it("allows rejection at first phase (records reason without changing phase)", async () => {
     const t1 = makeTask({
       title: "Task A",
       phases: ["implement"],
@@ -80,18 +80,25 @@ describe("reject_tasks tool", () => {
     });
     setupBoard([t1]);
 
-    const result = await tool.execute("call-1", { ids: [t1.id] }, mockSignal, noop, mockCtx);
+    const result = await tool.execute(
+      "call-1",
+      { ids: [t1.id], reason: "Needs rework" },
+      mockSignal,
+      noop,
+      mockCtx,
+    );
 
     expect(result.content[0]).toMatchObject({
       type: "text",
-      text: expect.stringContaining("first phase"),
+      text: expect.stringContaining("Rejected"),
     });
-    expect(result.details.error).toContain("first phase");
+    expect(result.details.error).toBeUndefined();
 
-    // State should be unchanged
+    // State: phase stays 0, status stays claimed, reason recorded
     const board = getBoard()!;
     expect(board.tasks[0]!.currentPhaseIndex).toBe(0);
     expect(board.tasks[0]!.status).toBe("claimed");
+    expect(board.tasks[0]!.reason).toBe("Needs rework");
   });
 
   it("returns error for non-claimed tasks", async () => {
@@ -179,6 +186,6 @@ describe("reject_tasks tool", () => {
     expect(result.details.action).toBe("reject");
     expect(result.details.board).not.toBeNull();
     expect(result.details.board!.tasks[0]!.currentPhaseIndex).toBe(0);
-    expect(result.details.board!.tasks[0]!.status).toBe("ready");
+    expect(result.details.board!.tasks[0]!.status).toBe("claimed");
   });
 });

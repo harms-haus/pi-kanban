@@ -6,7 +6,7 @@ export type TaskStatus = "blocked" | "ready" | "claimed" | "done";
 
 /** A single task on the kanban board */
 export interface Task {
-  /** Unique identifier (UUID) */
+  /** Unique identifier (kb-N sequential format) */
   id: string;
   /** Short description (max 100 chars) */
   title: string;

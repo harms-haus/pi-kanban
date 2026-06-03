@@ -57,15 +57,15 @@ export function resolveBlockedByTitles(
   tasks: Task[],
 ): { success: true } | { success: false; error: string } {
   const idSet = new Set(tasks.map((t) => t.id));
-  // RFC 4122 UUID pattern
-  const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+  // kb-N ID pattern
+  const KB_ID_RE = /^kb-\d+$/;
 
   for (const task of tasks) {
     const resolved: string[] = [];
 
     for (const ref of task.blockedBy) {
-      // If it looks like a UUID and exists as a task ID, keep it
-      if (UUID_RE.test(ref) && idSet.has(ref)) {
+      // If it matches the kb-N ID format and exists as a task ID, keep it
+      if (KB_ID_RE.test(ref) && idSet.has(ref)) {
         resolved.push(ref);
         continue;
       }

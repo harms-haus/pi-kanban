@@ -64,7 +64,9 @@ Creates a new kanban board. Only one board can exist at a time — calling this 
 | `description` | `string` | Yes | Detailed description for subagents (max 10,000 chars) |
 | `files` | `string[]` | No | Relevant file paths (max 50 items, 500 chars each) |
 | `phases` | `string[]` | No | Ordered subset of `test`, `implement`, `review`. Default: `["implement"]` |
-| `blockedBy` | `string[]` | No | Task IDs or titles this task depends on (max 20 items) |
+| `blockedBy` | `string[]` | No | Task IDs or titles this task depends on (max 20 items). Titles are resolved to IDs at board creation time. |
+
+Task IDs are auto-assigned in creation order as `kb-1`, `kb-2`, `kb-3`, etc. The `blockedBy` field accepts either IDs (e.g. `kb-3`) or titles (e.g. `"Set up database schema"`). Titles are resolved to IDs when the board is created.
 
 **Example:**
 
@@ -114,15 +116,15 @@ Returns the full board text or `"No board exists. Use create_kanban to create on
 
 ### `claim_tasks`
 
-Claims ready tasks from the board, up to the requested count and `maxClaims` limit. Always returns all currently outstanding (already claimed) tasks alongside any newly claimed ones.
+Claims up to `count` new ready tasks from the board, respecting the `maxClaims` limit. Always returns all currently outstanding (already claimed) tasks alongside any newly claimed ones.
 
 **Parameters:**
 
 | Parameter | Type | Required | Description |
 |-----------|------|----------|-------------|
-| `count` | `integer` | Yes | Number of tasks to claim (min 1) |
+| `count` | `integer` | Yes | Number of new tasks to claim (min 1) |
 
-The number of newly claimed tasks never exceeds `count`, ready tasks, or remaining capacity (`maxClaims` minus outstanding), whichever is smallest. If outstanding tasks already meet the requested count, no new tasks are claimed.
+The number of newly claimed tasks is the minimum of `count`, the number of ready tasks, and remaining capacity (`maxClaims` minus outstanding). The requested `count` refers only to new claims — outstanding tasks are always returned regardless.
 
 **Example:**
 
@@ -139,7 +141,7 @@ Each claimed task's output includes its ID, title, current phase, resolved profi
 
 ### `advance_tasks`
 
-Advances one or more claimed tasks to their next phase. Tasks that pass their final phase are marked `done`, and any tasks blocked by them are automatically unblocked.
+Advances one or more claimed tasks to their next phase. Tasks stay claimed through phase transitions. Tasks that pass their final phase are marked `done`, and any tasks blocked by them are automatically unblocked.
 
 **Parameters:**
 
@@ -155,7 +157,7 @@ All IDs are validated atomically — if any ID is invalid or not currently claim
 {
   "tool": "advance_tasks",
   "parameters": {
-    "ids": ["a1b2c3d4", "e5f6a7b8"]
+    "ids": ["kb-1", "kb-2"]
   }
 }
 ```
@@ -163,12 +165,12 @@ All IDs are validated atomically — if any ID is invalid or not currently claim
 **Behavior per task:**
 - `currentPhaseIndex` increments by 1
 - If `currentPhaseIndex >= phases.length` → task is marked `done`
-- Otherwise → task returns to `ready` status at the next phase
+- Otherwise → task stays `claimed` at the next phase (no need to re-claim)
 - For done tasks, all dependents are re-evaluated and unblocked if all their dependencies are satisfied
 
 ### `reject_tasks`
 
-Rejects one or more claimed tasks, moving them back one phase and releasing their claim (status → `ready`). Optionally records a rejection reason. Tasks at their first phase (`currentPhaseIndex === 0`) cannot be rejected.
+Rejects one or more claimed tasks, resetting them to phase 0 while keeping them claimed. Optionally records a rejection reason. Tasks at any phase — including the first phase — can be rejected. First-phase rejection records the reason without changing the phase index.
 
 **Parameters:**
 
@@ -177,7 +179,7 @@ Rejects one or more claimed tasks, moving them back one phase and releasing thei
 | `ids` | `string[]` | Yes | Task IDs to reject (1–50 items) |
 | `reason` | `string` | No | Reason for rejection |
 
-All IDs are validated atomically. If any ID is invalid, not claimed, or at the first phase, no tasks are rejected.
+All IDs are validated atomically. If any ID is invalid or not currently claimed, no tasks are rejected.
 
 **Example:**
 
@@ -185,7 +187,7 @@ All IDs are validated atomically. If any ID is invalid, not claimed, or at the f
 {
   "tool": "reject_tasks",
   "parameters": {
-    "ids": ["a1b2c3d4"],
+    "ids": ["kb-3"],
     "reason": "Tests failed — missing edge case for null input"
   }
 }
@@ -233,15 +235,19 @@ Phases must be a subsequence of this order — for example `["implement"]`, `["i
 ### Lifecycle
 
 ```
-  blocked → ready → claimed → (advance) → ready → ... → done
-                       ↑                     │
-                       └─── (reject) ────────┘
+  blocked → ready → claimed → (advance) → claimed → ... → done
+                  ↑    ↑                         │
+                  │    │                    (final phase)
+                  │    │                         ↓
+                  │    └─── (reject) ────→ claimed (phase 0)
+                  │
+               (unblocked when all blockers done)
 ```
 
-1. **Creation** — tasks with no `blockedBy` start as `ready`; tasks with unresolved dependencies start as `blocked`
+1. **Creation** — tasks with no `blockedBy` start as `ready`; tasks with unresolved dependencies start as `blocked`. Task IDs are auto-assigned as `kb-1`, `kb-2`, etc. in creation order.
 2. **Claiming** — `claim_tasks` moves `ready` tasks to `claimed` up to the `maxClaims` limit
-3. **Advancing** — `advance_tasks` increments the phase index. If past the last phase, the task becomes `done`
-4. **Rejecting** — `reject_tasks` decrements the phase index and returns the task to `ready` (not available for tasks at their first phase)
+3. **Advancing** — `advance_tasks` increments the phase index. Tasks stay `claimed` through phase transitions. If past the last phase, the task becomes `done`
+4. **Rejecting** — `reject_tasks` resets the task to phase 0 and keeps it `claimed` (available at any phase, including the first)
 5. **Unblocking** — when a task reaches `done`, all `blocked` tasks are re-evaluated; those whose `blockedBy` list is fully satisfied transition to `ready`
 
 ### Dependencies
@@ -288,7 +294,7 @@ Returns the full details (title, description, phase, profile, files) for claimed
 ```json
 {
   "tool": "advance_tasks",
-  "parameters": { "ids": ["a1b2c3d4"] }
+  "parameters": { "ids": ["kb-1"] }
 }
 ```
 
@@ -297,11 +303,11 @@ If the work needs rework, reject with a reason:
 ```json
 {
   "tool": "reject_tasks",
-  "parameters": { "ids": ["a1b2c3d4"], "reason": "Missing error handling for 429 responses" }
+  "parameters": { "ids": ["kb-1"], "reason": "Missing error handling for 429 responses" }
 }
 ```
 
-**5. Repeat** — call `claim_tasks` again to pick up newly ready tasks (including unblocked dependents and rejected tasks). Continue until all tasks are `done`.
+**5. Repeat** — call `claim_tasks` again to pick up newly ready tasks (including unblocked dependents). Continue until all tasks are `done`.
 
 ## State Persistence
 

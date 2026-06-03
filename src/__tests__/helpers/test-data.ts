@@ -1,10 +1,15 @@
 import type { KanbanBoard, Task } from "../../types";
 import { DEFAULT_PROFILE_MAP, DEFAULT_MAX_CLAIMS } from "../../types";
-import { randomUUID } from "node:crypto";
+
+let taskCounter = 0;
+
+export function resetTestCounters(): void {
+  taskCounter = 0;
+}
 
 export function makeTask(overrides: Partial<Task> = {}): Task {
   return {
-    id: randomUUID(),
+    id: `kb-${++taskCounter}`,
     title: "Test task",
     description: "A test task description",
     files: [],

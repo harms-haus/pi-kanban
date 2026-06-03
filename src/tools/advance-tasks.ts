@@ -31,12 +31,12 @@ export function createAdvanceTasksTool(): ToolDefinition<
     name: "advance_tasks",
     label: "Advance Tasks",
     description:
-      "Advance one or more claimed tasks to their next phase. Tasks that reach the end of their phase list are marked as done.",
+      "Advance one or more claimed tasks to their next phase. Tasks stay claimed through phase transitions. Tasks that reach the end of their phase list are marked as done.",
     promptSnippet:
       "Advance claimed tasks to the next phase, or mark as done if the current phase is the last.",
     promptGuidelines: [
       "Use advance_tasks to move claimed tasks forward through their phase lifecycle.",
-      "Each call advances the task's currentPhaseIndex by 1. If the task reaches the end of its phases array, it is marked as done.",
+      "Each call advances the task's currentPhaseIndex by 1. Tasks remain claimed between phases. If the task reaches the end of its phases array, it is marked as done.",
       "After advancement, any tasks that were blocked by the completing tasks are automatically unblocked if all their dependencies are done.",
       "All tasks in a single call are validated atomically — no changes are made if any task ID is invalid or not currently claimed.",
     ],
@@ -83,7 +83,7 @@ export function createAdvanceTasksTool(): ToolDefinition<
         const task = getTaskById(id)!;
 
         task.currentPhaseIndex++;
-        const shortId = task.id.slice(0, 8);
+        const shortId = task.id;
 
         if (task.currentPhaseIndex >= task.phases.length) {
           // Task is done
@@ -94,7 +94,7 @@ export function createAdvanceTasksTool(): ToolDefinition<
           completed.push(shortId);
         } else {
           // Advance to next phase
-          task.status = "ready";
+          task.status = "claimed";
           task.profile = resolveTaskProfile(task, board.profileMap);
           task.reason = undefined;
           advanced.push(shortId);

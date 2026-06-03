@@ -59,7 +59,7 @@ describe("formatPhaseLabel", () => {
 describe("formatTaskText", () => {
   it("formats a task with correct icon, short ID, title, phase, and status", () => {
     const task = makeTask({
-      id: "abcdefgh-1234-5678-9abc-def012345678",
+      id: "kb-1",
       title: "My task",
       phases: ["implement"],
       currentPhaseIndex: 0,
@@ -67,19 +67,19 @@ describe("formatTaskText", () => {
     });
     const result = formatTaskText(task);
     const expectedIcon = STATUS_ICONS["ready"];
-    expect(result).toBe(`${expectedIcon} [abcdefgh] My task (implement, ready)`);
+    expect(result).toBe(`${expectedIcon} [kb-1] My task (implement, ready)`);
   });
 
   it("formats a done task correctly", () => {
     const task = makeTask({
-      id: "12345678-abcd",
+      id: "kb-2",
       title: "Done task",
       currentPhaseIndex: -1,
       status: "done",
     });
     const result = formatTaskText(task);
     const expectedIcon = STATUS_ICONS["done"];
-    expect(result).toBe(`${expectedIcon} [12345678] Done task (done, done)`);
+    expect(result).toBe(`${expectedIcon} [kb-2] Done task (done, done)`);
   });
 
   it("formats a blocked task correctly", () => {
@@ -104,14 +104,7 @@ describe("formatTaskText", () => {
     expect(result).toBe(`${expectedIcon} [a1b2c3d4] Claimed task (implement, claimed)`);
   });
 
-  it("truncates ID to 8 characters", () => {
-    const task = makeTask({
-      id: "1234567890abcdef",
-      title: "Task",
-    });
-    const result = formatTaskText(task);
-    expect(result).toContain("[12345678]");
-  });
+
 });
 
 // ── formatBoardText ──────────────────────────────────────────────────

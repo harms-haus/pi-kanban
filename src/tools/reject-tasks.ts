@@ -1,8 +1,8 @@
 /**
  * reject_tasks tool
  *
- * Rejects one or more claimed tasks, moving them back one phase and
- * releasing their claim (status → "ready").
+ * Rejects one or more claimed tasks, resetting them to phase 0
+ * while keeping them claimed.
  */
 
 import { Type } from "typebox";
@@ -49,7 +49,7 @@ export function createRejectTasksTool(): ToolDefinition<RejectTasksParamsType, K
     name: "reject_tasks",
     label: "Reject Tasks",
     description:
-      "Reject one or more claimed tasks, moving them back one phase and releasing their claim (status → ready). Tasks at the first phase cannot be rejected.",
+      "Reject one or more claimed tasks, resetting them to phase 0 while keeping them claimed. Tasks at the first phase can be rejected — this records the reason without changing the phase.",
 
     parameters: RejectTasksParams,
 
@@ -83,10 +83,7 @@ export function createRejectTasksTool(): ToolDefinition<RejectTasksParamsType, K
           errors.push(`task "${id}" is not claimed (current status: ${task.status})`);
           continue;
         }
-        if (task.currentPhaseIndex === 0) {
-          errors.push(`task "${id}" is already at the first phase and cannot be rejected`);
-          continue;
-        }
+
       }
 
       if (errors.length > 0) {
@@ -97,8 +94,8 @@ export function createRejectTasksTool(): ToolDefinition<RejectTasksParamsType, K
       for (const id of uniqueIds) {
         // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
         const task = getTaskById(id)!;
-        task.currentPhaseIndex--;
-        task.status = "ready";
+        task.currentPhaseIndex = 0;
+        task.status = "claimed";
         task.profile = resolveTaskProfile(task, board.profileMap);
         task.reason = params.reason ?? undefined;
       }
@@ -133,12 +130,12 @@ export function createRejectTasksTool(): ToolDefinition<RejectTasksParamsType, K
 
     renderResult: renderToolResult,
 
-    promptSnippet: "Reject claimed tasks back to the previous phase",
+    promptSnippet: "Reject claimed tasks, resetting to first phase while keeping claimed",
     promptGuidelines: [
-      "Use reject_tasks when a task's work is not acceptable and needs to go back to the previous phase.",
-      "Tasks can only be rejected if they are currently claimed and not at the first phase.",
+      "Use reject_tasks when a task's work is not acceptable and needs to be restarted from the beginning.",
+      "Tasks can be rejected at any phase, including the first phase (which records the reason without changing the phase index).",
       "Provide a reason for rejection to help the next worker understand what went wrong.",
-      "After rejection, the task returns to 'ready' status for re-claiming.",
+      "After rejection, the task stays claimed but is reset to its first phase for re-execution.",
     ],
   };
 }

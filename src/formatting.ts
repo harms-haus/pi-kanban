@@ -24,11 +24,11 @@ export function formatPhaseLabel(task: Task): string {
 /**
  * Formats a single task as plain text.
  *
- * Format: `{icon} [{id.slice(0,8)}] {title} ({phase}, {status})`
+ * Format: `{icon} [{id}] {title} ({phase}, {status})`
  */
 export function formatTaskText(task: Task): string {
   const icon = STATUS_ICONS[task.status];
-  const shortId = task.id.slice(0, 8);
+  const shortId = task.id;
   const phase = formatPhaseLabel(task);
   return `${icon} [${shortId}] ${task.title} (${phase}, ${task.status})`;
 }
@@ -155,7 +155,7 @@ export function renderBoard(board: KanbanBoard, theme: Theme): string {
 
     for (const task of group) {
       const icon = getStatusIcon(task.status, theme);
-      const shortId = task.id.slice(0, 8);
+      const shortId = task.id;
       const phaseLabel = formatPhaseLabel(task);
       const phaseIcon = getPhaseIcon(phaseLabel, theme);
 

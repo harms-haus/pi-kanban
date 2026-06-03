@@ -25,15 +25,15 @@ export function createClaimTasksTool(): ToolDefinition<typeof ClaimTasksParams, 
     name: "claim_tasks",
     label: "Claim Tasks",
     description:
-      "Claim ready tasks from the kanban board. Selects tasks based on maxClaims limits and the requested count. Always returns outstanding (already claimed) tasks in the output.",
+      "Claim up to count ready tasks from the kanban board, respecting maxClaims limits. Always returns all currently claimed (outstanding) tasks plus the newly claimed tasks.",
     parameters: ClaimTasksParams,
     promptSnippet: "Claim tasks from the kanban board",
     promptGuidelines: [
-      "Use claim_tasks with a count to claim the specified number of ready tasks.",
+      "Use claim_tasks with a count to claim up to that many new ready tasks. All outstanding (already claimed) tasks are always included in the result.",
       "Outstanding (already claimed) tasks are always included in the output.",
       "The maximum number of concurrent claims is limited by the board's maxClaims setting.",
       "Use advance_tasks to move claimed tasks through their lifecycle phases.",
-      "Use reject_tasks to unclaim and return tasks to the ready pool.",
+      "Use reject_tasks to reset a claimed task back to its first phase for re-execution while keeping it claimed.",
     ],
 
     // eslint-disable-next-line @typescript-eslint/require-await
@@ -54,22 +54,18 @@ export function createClaimTasksTool(): ToolDefinition<typeof ClaimTasksParams, 
       const maxClaims = board.maxClaims;
       const remaining = maxClaims - outstanding.length;
 
-      let newlyClaimedCount = 0;
+      const newlyClaimedCount = Math.min(
+        params.count,
+        ready.length,
+        Math.max(0, remaining),
+      );
       const newlyClaimed: typeof outstanding = [];
 
-      if (outstanding.length < params.count) {
-        newlyClaimedCount = Math.min(
-          params.count - outstanding.length,
-          ready.length,
-          Math.max(0, remaining),
-        );
-
-        // Take first newlyClaimedCount ready tasks, set status and confirm profile
-        newlyClaimed.push(...ready.slice(0, newlyClaimedCount));
-        for (const task of newlyClaimed) {
-          task.status = "claimed";
-          task.profile = resolveTaskProfile(task, board.profileMap);
-        }
+      // Take first newlyClaimedCount ready tasks, set status and confirm profile
+      newlyClaimed.push(...ready.slice(0, newlyClaimedCount));
+      for (const task of newlyClaimed) {
+        task.status = "claimed";
+        task.profile = resolveTaskProfile(task, board.profileMap);
       }
 
       // Build content: outstanding + newly claimed
