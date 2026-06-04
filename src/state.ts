@@ -49,8 +49,10 @@ export function getTasksByStatus(status: TaskStatus): Task[] {
 /**
  * For each task's blockedBy entries, resolve title references to task IDs.
  *
- * If a blockedBy entry is a valid UUID that matches an existing task ID, it is kept as-is.
- * Otherwise it is treated as a title and replaced with the matching task's ID.
+ * Resolves titles across the entire passed array (for append mode, the caller
+ * passes existing + new tasks combined). If a blockedBy entry is a valid kb-N ID
+ * that matches an existing task ID, it is kept as-is. Otherwise it is treated as
+ * a title and replaced with the matching task's ID.
  * Returns an error if any reference cannot be resolved.
  */
 export function resolveBlockedByTitles(
@@ -134,6 +136,39 @@ export function unblockDependents(_taskId: string): void {
   }
 }
 
+// ── Recompute Statuses ──
+
+/**
+ * Recomputes statuses for all tasks with status "blocked" or "ready".
+ *
+ * Does NOT touch tasks with status "claimed" or "done". Uses a taskMap
+ * for O(1) dependency lookups.
+ *
+ * Logic for each blocked/ready task:
+ * - If blockedBy.length === 0 → "ready"
+ * - Else if ALL blockedBy task IDs have status "done" → "ready"
+ * - Else → "blocked"
+ */
+export function recomputeStatuses(board: KanbanBoard): void {
+  const taskMap = new Map(board.tasks.map((t) => [t.id, t]));
+
+  for (const task of board.tasks) {
+    if (task.status !== "blocked" && task.status !== "ready") continue;
+
+    if (task.blockedBy.length === 0) {
+      task.status = "ready";
+      continue;
+    }
+
+    const allDone = task.blockedBy.every((depId) => {
+      const dep = taskMap.get(depId);
+      return dep?.status === "done";
+    });
+
+    task.status = allDone ? "ready" : "blocked";
+  }
+}
+
 // ── Resolve Task Profile ──
 
 /**
@@ -194,6 +229,18 @@ export function reconstructState(ctx: ExtensionContext): KanbanBoard | null {
 
     if (validTasks.length === 0) continue;
 
+    // Compute nextId: use raw value if present, otherwise derive from task IDs
+    const nextId: number =
+      typeof rawBoard.nextId === "number"
+        ? rawBoard.nextId
+        : Math.max(
+            0,
+            ...validTasks.map((t: Task) => {
+              const n = parseInt(t.id.slice(3), 10);
+              return Number.isNaN(n) ? 0 : n;
+            }),
+          ) + 1;
+
     // Reconstruct a proper KanbanBoard from the raw data
     const reconstructed: KanbanBoard = {
       tasks: validTasks,
@@ -203,6 +250,7 @@ export function reconstructState(ctx: ExtensionContext): KanbanBoard | null {
           : {},
       maxClaims: typeof rawBoard.maxClaims === "number" ? rawBoard.maxClaims : 4,
       createdAt: typeof rawBoard.createdAt === "number" ? rawBoard.createdAt : Date.now(),
+      nextId,
     };
 
     return cloneBoard(reconstructed);

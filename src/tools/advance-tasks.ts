@@ -54,7 +54,7 @@ export function createAdvanceTasksTool(): ToolDefinition<
     ) {
       const board = getBoard();
       if (!board) {
-        throw new Error("No board exists. Use create_kanban first.");
+        throw new Error("No board exists. Use write_kanban to create one.");
       }
 
       // Deduplicate IDs

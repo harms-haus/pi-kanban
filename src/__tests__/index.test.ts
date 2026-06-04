@@ -58,7 +58,7 @@ describe("default export (extension factory)", () => {
     const names = capturedTools.map((t) => t.name);
     expect(names).toEqual(
       expect.arrayContaining([
-        "create_kanban",
+        "write_kanban",
         "list_kanban",
         "claim_tasks",
         "advance_tasks",

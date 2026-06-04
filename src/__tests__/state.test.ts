@@ -8,6 +8,7 @@ import {
   resolveBlockedByTitles,
   computeInitialStatuses,
   unblockDependents,
+  recomputeStatuses,
   resolveTaskProfile,
   reconstructState,
 } from "../state";
@@ -174,6 +175,87 @@ describe("resolveBlockedByTitles", () => {
 
     const result = resolveBlockedByTitles([taskA, taskB]);
     expect(result.success).toBe(false);
+  });
+});
+
+// ── recomputeStatuses ─────────────────────────────────────────────
+
+describe("recomputeStatuses", () => {
+  it("blocked task whose deps are all done → becomes ready", () => {
+    const taskA = makeTask({ id: "kb-1", status: "done" });
+    const taskB = makeTask({ id: "kb-2", status: "blocked", blockedBy: ["kb-1"] });
+    const board = makeBoard([taskA, taskB]);
+    recomputeStatuses(board);
+    expect(taskB.status).toBe("ready");
+  });
+
+  it("blocked task with incomplete deps → stays blocked", () => {
+    const taskA = makeTask({ id: "kb-1", status: "ready" });
+    const taskB = makeTask({ id: "kb-2", status: "blocked", blockedBy: ["kb-1"] });
+    const board = makeBoard([taskA, taskB]);
+    recomputeStatuses(board);
+    expect(taskB.status).toBe("blocked");
+  });
+
+  it("ready task with no deps → stays ready", () => {
+    const task = makeTask({ id: "kb-1", status: "ready", blockedBy: [] });
+    const board = makeBoard([task]);
+    recomputeStatuses(board);
+    expect(task.status).toBe("ready");
+  });
+
+  it("ready task that now has non-done deps → becomes blocked", () => {
+    const taskA = makeTask({ id: "kb-1", status: "ready" });
+    const taskB = makeTask({ id: "kb-2", status: "ready", blockedBy: ["kb-1"] });
+    const board = makeBoard([taskA, taskB]);
+    recomputeStatuses(board);
+    expect(taskB.status).toBe("blocked");
+  });
+
+  it("claimed task → untouched", () => {
+    const taskA = makeTask({ id: "kb-1", status: "done" });
+    const taskB = makeTask({ id: "kb-2", status: "claimed", blockedBy: ["kb-1"] });
+    const board = makeBoard([taskA, taskB]);
+    recomputeStatuses(board);
+    expect(taskB.status).toBe("claimed");
+  });
+
+  it("done task → untouched", () => {
+    const task = makeTask({
+      id: "kb-1",
+      status: "done",
+      currentPhaseIndex: -1,
+      blockedBy: ["kb-0"],
+    });
+    const board = makeBoard([task]);
+    recomputeStatuses(board);
+    expect(task.status).toBe("done");
+  });
+
+  it("empty blockedBy → becomes ready", () => {
+    const task = makeTask({ id: "kb-1", status: "blocked", blockedBy: [] });
+    const board = makeBoard([task]);
+    recomputeStatuses(board);
+    expect(task.status).toBe("ready");
+  });
+
+  it("mixed board with multiple scenarios", () => {
+    const taskA = makeTask({ id: "kb-1", status: "done" });
+    const taskB = makeTask({ id: "kb-2", status: "ready", blockedBy: ["kb-1"] });
+    // taskB is ready but depends on done task — should stay ready
+    const taskC = makeTask({ id: "kb-3", status: "blocked", blockedBy: ["kb-1"] });
+    // taskC is blocked but dep is done — should become ready
+    const taskD = makeTask({ id: "kb-4", status: "claimed", blockedBy: ["kb-2"] });
+    // taskD is claimed — untouched
+    const taskE = makeTask({ id: "kb-5", status: "blocked", blockedBy: ["kb-3", "kb-4"] });
+    // taskE is blocked, kb-3 will be ready and kb-4 is claimed — stays blocked
+    const board = makeBoard([taskA, taskB, taskC, taskD, taskE]);
+    recomputeStatuses(board);
+    expect(taskA.status).toBe("done");
+    expect(taskB.status).toBe("ready");
+    expect(taskC.status).toBe("ready");
+    expect(taskD.status).toBe("claimed");
+    expect(taskE.status).toBe("blocked");
   });
 });
 
@@ -357,8 +439,8 @@ describe("reconstructState", () => {
             type: "message",
             message: {
               role: "toolResult",
-              toolName: "create_kanban",
-              details: { action: "create" },
+              toolName: "write_kanban",
+              details: { action: "write" },
             },
           },
         ],
@@ -375,7 +457,7 @@ describe("reconstructState", () => {
             type: "message",
             message: {
               role: "toolResult",
-              toolName: "create_kanban",
+              toolName: "write_kanban",
               details: { board: { tasks: "not-array" } },
             },
           },
@@ -412,14 +494,15 @@ describe("reconstructState", () => {
             type: "message",
             message: {
               role: "toolResult",
-              toolName: "create_kanban",
+              toolName: "write_kanban",
               details: {
-                action: "create",
+                action: "write",
                 board: {
                   tasks: [task],
                   profileMap: DEFAULT_PROFILE_MAP,
                   maxClaims: 4,
                   createdAt: 1234567890,
+                  nextId: 5,
                 },
               },
             },
@@ -435,6 +518,7 @@ describe("reconstructState", () => {
     expect(result!.profileMap).toEqual(DEFAULT_PROFILE_MAP);
     expect(result!.maxClaims).toBe(4);
     expect(result!.createdAt).toBe(1234567890);
+    expect(result!.nextId).toBe(5);
   });
 
   it("uses most recent valid entry (reverse scan)", () => {
@@ -447,10 +531,16 @@ describe("reconstructState", () => {
             type: "message",
             message: {
               role: "toolResult",
-              toolName: "create_kanban",
+              toolName: "write_kanban",
               details: {
-                action: "create",
-                board: { tasks: [oldTask], profileMap: {}, maxClaims: 4, createdAt: 100 },
+                action: "write",
+                board: {
+                  tasks: [oldTask],
+                  profileMap: {},
+                  maxClaims: 4,
+                  createdAt: 100,
+                  nextId: 2,
+                },
               },
             },
           },
@@ -461,7 +551,13 @@ describe("reconstructState", () => {
               toolName: "advance_tasks",
               details: {
                 action: "advance",
-                board: { tasks: [newTask], profileMap: {}, maxClaims: 4, createdAt: 200 },
+                board: {
+                  tasks: [newTask],
+                  profileMap: {},
+                  maxClaims: 4,
+                  createdAt: 200,
+                  nextId: 3,
+                },
               },
             },
           },
@@ -484,10 +580,10 @@ describe("reconstructState", () => {
             type: "message",
             message: {
               role: "toolResult",
-              toolName: "create_kanban",
+              toolName: "write_kanban",
               details: {
-                action: "create",
-                board: { tasks: [task], profileMap: {}, maxClaims: 4, createdAt: 100 },
+                action: "write",
+                board: { tasks: [task], profileMap: {}, maxClaims: 4, createdAt: 100, nextId: 1 },
               },
             },
           },
@@ -512,14 +608,15 @@ describe("reconstructState", () => {
             type: "message",
             message: {
               role: "toolResult",
-              toolName: "create_kanban",
+              toolName: "write_kanban",
               details: {
-                action: "create",
+                action: "write",
                 board: {
                   tasks: [validTask, { id: "" }, { notATask: true }],
                   profileMap: {},
                   maxClaims: 4,
                   createdAt: 100,
+                  nextId: 2,
                 },
               },
             },
@@ -542,14 +639,15 @@ describe("reconstructState", () => {
             type: "message",
             message: {
               role: "toolResult",
-              toolName: "create_kanban",
+              toolName: "write_kanban",
               details: {
-                action: "create",
+                action: "write",
                 board: {
                   tasks: [{ id: "" }, { notATask: true }],
                   profileMap: {},
                   maxClaims: 4,
                   createdAt: 100,
+                  nextId: 1,
                 },
               },
             },
@@ -571,10 +669,10 @@ describe("reconstructState", () => {
             type: "message",
             message: {
               role: "toolResult",
-              toolName: "create_kanban",
+              toolName: "write_kanban",
               details: {
-                action: "create",
-                board: { tasks: [task], profileMap: {}, maxClaims: 4, createdAt: 100 },
+                action: "write",
+                board: { tasks: [task], profileMap: {}, maxClaims: 4, createdAt: 100, nextId: 1 },
               },
             },
           },
@@ -614,9 +712,9 @@ describe("reconstructState", () => {
             type: "message",
             message: {
               role: "toolResult",
-              toolName: "create_kanban",
+              toolName: "write_kanban",
               details: {
-                action: "create",
+                action: "write",
                 board: { tasks: [task] },
               },
             },
@@ -630,11 +728,15 @@ describe("reconstructState", () => {
     expect(result!.profileMap).toEqual({});
     expect(result!.maxClaims).toBe(4);
     expect(typeof result!.createdAt).toBe("number");
+    // nextId computed from tasks when missing
+    const n = parseInt(task.id.slice(3), 10);
+    expect(result!.nextId).toBe((Number.isNaN(n) ? 0 : n) + 1);
   });
 
-  it("recognizes all TOOL_NAMES (create, list, claim, advance, reject)", () => {
+  it("recognizes all TOOL_NAMES (create, write, list, claim, advance, reject)", () => {
     const toolNames = [
       "create_kanban",
+      "write_kanban",
       "list_kanban",
       "claim_tasks",
       "advance_tasks",
@@ -652,8 +754,8 @@ describe("reconstructState", () => {
                 role: "toolResult",
                 toolName,
                 details: {
-                  action: "create",
-                  board: { tasks: [task], profileMap: {}, maxClaims: 4, createdAt: 100 },
+                  action: "write",
+                  board: { tasks: [task], profileMap: {}, maxClaims: 4, createdAt: 100, nextId: 1 },
                 },
               },
             },
@@ -665,5 +767,66 @@ describe("reconstructState", () => {
       expect(result).not.toBeNull();
       expect(result!.tasks[0]!.id).toBe(task.id);
     }
+  });
+
+  it("preserves nextId from raw data when present", () => {
+    const task = makeTask({ id: "kb-42" });
+    const ctx = createMockContext({
+      sessionManager: {
+        getBranch: () => [
+          {
+            type: "message",
+            message: {
+              role: "toolResult",
+              toolName: "write_kanban",
+              details: {
+                action: "write",
+                board: {
+                  tasks: [task],
+                  profileMap: {},
+                  maxClaims: 4,
+                  createdAt: 100,
+                  nextId: 99,
+                },
+              },
+            },
+          },
+        ],
+      },
+    });
+
+    const result = reconstructState(ctx);
+    expect(result).not.toBeNull();
+    expect(result!.nextId).toBe(99);
+  });
+
+  it("computes nextId from tasks when missing", () => {
+    const task = makeTask({ id: "kb-7" });
+    const ctx = createMockContext({
+      sessionManager: {
+        getBranch: () => [
+          {
+            type: "message",
+            message: {
+              role: "toolResult",
+              toolName: "write_kanban",
+              details: {
+                action: "write",
+                board: {
+                  tasks: [task],
+                  profileMap: {},
+                  maxClaims: 4,
+                  createdAt: 100,
+                },
+              },
+            },
+          },
+        ],
+      },
+    });
+
+    const result = reconstructState(ctx);
+    expect(result).not.toBeNull();
+    expect(result!.nextId).toBe(8); // max kb-7 → 7, +1 = 8
   });
 });

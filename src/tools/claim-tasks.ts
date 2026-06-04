@@ -47,7 +47,7 @@ export function createClaimTasksTool(): ToolDefinition<typeof ClaimTasksParams, 
     ) {
       const board = getBoard();
       if (!board) {
-        throw new Error("No board exists. Use create_kanban first.");
+        throw new Error("No board exists. Use write_kanban to create one.");
       }
 
       const outstanding = getTasksByStatus("claimed");

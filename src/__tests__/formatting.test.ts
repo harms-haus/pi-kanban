@@ -347,7 +347,7 @@ describe("renderToolResult", () => {
     const result = {
       content: [{ type: "text", text: "error message" }],
       details: {
-        action: "create" as const,
+        action: "write" as const,
         board: null,
         error: "something went wrong",
       },
@@ -363,7 +363,7 @@ describe("renderToolResult", () => {
     const result = {
       content: [{ type: "text", text: "ok" }],
       details: {
-        action: "create" as const,
+        action: "write" as const,
         board: makeBoard([task]),
       },
     };

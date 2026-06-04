@@ -38,12 +38,14 @@ export interface KanbanBoard {
   maxClaims: number;
   /** Board creation timestamp */
   createdAt: number;
+  /** Auto-increment counter for task IDs — never reused, never squashed */
+  nextId: number;
 }
 
 /** Persistence envelope for tool result details */
 export interface KanbanDetails {
   /** Which tool produced this entry */
-  action: "create" | "list" | "claim" | "advance" | "reject";
+  action: "write" | "list" | "claim" | "advance" | "reject";
   /** Full board snapshot (null for list on empty board) */
   board: KanbanBoard | null;
   /** Error message if tool returned an error */
@@ -77,6 +79,7 @@ export const DEFAULT_MAX_CLAIMS = 4;
 /** Tool names that produce KanbanDetails for state reconstruction */
 export const TOOL_NAMES = new Set([
   "create_kanban",
+  "write_kanban",
   "list_kanban",
   "claim_tasks",
   "advance_tasks",

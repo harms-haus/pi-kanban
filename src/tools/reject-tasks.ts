@@ -65,7 +65,7 @@ export function createRejectTasksTool(): ToolDefinition<RejectTasksParamsType, K
       // 1. Board must exist
       const board = getBoard();
       if (!board) {
-        return rejectErrorResult(null, "No board exists. Use create_kanban first.");
+        return rejectErrorResult(null, "No board exists. Use write_kanban to create one.");
       }
 
       // 2. Deduplicate IDs

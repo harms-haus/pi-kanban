@@ -1,6 +1,6 @@
 {
   "name": "@harms-haus/pi-kanban",
-  "version": "1.2.0",
+  "version": "1.3.0",
   "description": "pi-coding-agent extension: kanban-style task board for managing work across parallel subagents",
   "keywords": [
     "pi-package"

@@ -40,7 +40,7 @@ export function createListKanbanTool(): ToolDefinition<typeof ListKanbanParams, 
           content: [
             {
               type: "text" as const,
-              text: "No board exists. Use create_kanban to create one.",
+              text: "No board exists. Use write_kanban to create one.",
             },
           ],
           details: { action: "list" as const, board: null },

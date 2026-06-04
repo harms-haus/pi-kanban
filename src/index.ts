@@ -1,7 +1,7 @@
 /**
  * Kanban Extension — Kanban-style task board for managing work across parallel subagents
  *
- * Registers 5 tools: create_kanban, list_kanban, claim_tasks, advance_tasks, reject_tasks
+ * Registers 5 tools: write_kanban, list_kanban, claim_tasks, advance_tasks, reject_tasks
  *
  * Features:
  * - Full board state in LLM content after every tool call
@@ -15,7 +15,7 @@ import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
 import { Text } from "@earendil-works/pi-tui";
 import { getBoard, setBoard, resetState, reconstructState } from "./state";
 import { formatBoardText } from "./formatting";
-import { createKanbanTool } from "./tools/create-kanban";
+import { writeKanbanTool } from "./tools/write-kanban";
 import { createListKanbanTool } from "./tools/list-kanban";
 import { createClaimTasksTool } from "./tools/claim-tasks";
 import { createAdvanceTasksTool } from "./tools/advance-tasks";
@@ -23,7 +23,7 @@ import { createRejectTasksTool } from "./tools/reject-tasks";
 
 export default function (pi: ExtensionAPI): void {
   // ── Register Tools ──
-  pi.registerTool(createKanbanTool());
+  pi.registerTool(writeKanbanTool());
   pi.registerTool(createListKanbanTool());
   pi.registerTool(createClaimTasksTool());
   pi.registerTool(createAdvanceTasksTool());

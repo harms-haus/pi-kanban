@@ -1,7 +1,7 @@
 # pi-kanban
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
-![Version](https://img.shields.io/badge/version-1.2.0-blue)
+![Version](https://img.shields.io/badge/version-1.3.0-blue)
 
 A pi-coding-agent extension that provides a kanban-style task board for managing parallel subagent work. Tasks flow through configurable phases (test → implement → review) with dependency tracking and automatic unblocking.
 
@@ -45,35 +45,33 @@ The extension auto-registers via the `pi.extensions` field in `package.json`:
 
 ## Tools Reference
 
-### `create_kanban`
+### `write_kanban`
 
-Creates a new kanban board. Only one board can exist at a time — calling this throws an error if a board already exists.
+Creates or modifies a kanban board. Supports four modes: `replace`, `append`, `edit`, and `delete`. Only one board can exist at a time.
+
+**Common parameter — `mode`** (required): one of `replace`, `append`, `edit`, `delete`.
+
+---
+
+#### Mode: `replace`
+
+Creates a new board. Errors if a board already exists. Task IDs start at `kb-1`.
 
 **Parameters:**
 
 | Parameter    | Type                     | Required | Description                              |
 | ------------ | ------------------------ | -------- | ---------------------------------------- |
+| `mode`       | `"replace"`              | Yes      | Create a new board                       |
 | `tasks`      | `TaskInput[]`            | Yes      | Array of tasks (1–100 items)             |
 | `profileMap` | `Record<string, string>` | No       | Override default phase → profile mapping |
-
-**TaskInput:**
-
-| Field         | Type       | Required | Description                                                                                                |
-| ------------- | ---------- | -------- | ---------------------------------------------------------------------------------------------------------- |
-| `title`       | `string`   | Yes      | Short title (max 100 chars)                                                                                |
-| `description` | `string`   | Yes      | Detailed description for subagents (max 10,000 chars)                                                      |
-| `files`       | `string[]` | No       | Relevant file paths (max 50 items, 500 chars each)                                                         |
-| `phases`      | `string[]` | No       | Ordered subset of `test`, `implement`, `review`. Default: `["implement"]`                                  |
-| `blockedBy`   | `string[]` | No       | Task IDs or titles this task depends on (max 20 items). Titles are resolved to IDs at board creation time. |
-
-Task IDs are auto-assigned in creation order as `kb-1`, `kb-2`, `kb-3`, etc. The `blockedBy` field accepts either IDs (e.g. `kb-3`) or titles (e.g. `"Set up database schema"`). Titles are resolved to IDs when the board is created.
 
 **Example:**
 
 ```json
 {
-  "tool": "create_kanban",
+  "tool": "write_kanban",
   "parameters": {
+    "mode": "replace",
     "tasks": [
       {
         "title": "Set up database schema",
@@ -97,6 +95,143 @@ Task IDs are auto-assigned in creation order as `kb-1`, `kb-2`, `kb-3`, etc. The
 }
 ```
 
+---
+
+#### Mode: `append`
+
+Adds tasks to an existing board. Requires a board to exist. New task IDs continue from the board's `nextId` counter (e.g. if the board has `kb-1` through `kb-3`, appended tasks start at `kb-4`). New tasks can reference existing tasks in their `blockedBy` field. The board's total task count cannot exceed 100.
+
+**Parameters:**
+
+| Parameter    | Type                     | Required | Description                              |
+| ------------ | ------------------------ | -------- | ---------------------------------------- |
+| `mode`       | `"append"`               | Yes      | Add tasks to an existing board           |
+| `tasks`      | `TaskInput[]`            | Yes      | Array of tasks to add (1–100 items)      |
+| `profileMap` | `Record<string, string>` | No       | Merged on top of existing profileMap     |
+
+**Example:**
+
+```json
+{
+  "tool": "write_kanban",
+  "parameters": {
+    "mode": "append",
+    "tasks": [
+      {
+        "title": "Add logging middleware",
+        "description": "Implement request/response logging for all endpoints.",
+        "files": ["src/middleware/"],
+        "phases": ["implement", "review"],
+        "blockedBy": ["kb-1"]
+      }
+    ]
+  }
+}
+```
+
+---
+
+#### Mode: `edit`
+
+Modifies existing tasks. Only the fields specified in each edit's `set` object are changed — omitted fields remain untouched. All edits are validated atomically: if any edit references a missing task ID or contains invalid data, no edits are applied. If multiple edits reference the same task ID, only the last entry per ID is applied. If `blockedBy` or `phases` changes, statuses are recomputed and a cycle check is performed (edits are rolled back on failure).
+
+**Parameters:**
+
+| Parameter | Type                  | Required | Description                          |
+| --------- | --------------------- | -------- | ------------------------------------ |
+| `mode`    | `"edit"`              | Yes      | Modify existing tasks                |
+| `edits`   | `EditEntry[]`         | Yes      | Array of edits (1–50 items)          |
+
+**EditEntry:**
+
+| Field  | Type       | Required | Description                                                      |
+| ------ | ---------- | -------- | ---------------------------------------------------------------- |
+| `id`   | `string`   | Yes      | Task ID to edit (e.g. `kb-3`)                                    |
+| `set`  | `object`   | Yes      | Fields to change. Only provided keys are updated.                |
+
+The `set` object accepts these optional fields (`additionalProperties: false`):
+
+| `set` field   | Type       | Description                                                                 |
+| ------------- | ---------- | --------------------------------------------------------------------------- |
+| `title`       | `string`   | New title (max 100 chars)                                                   |
+| `description` | `string`   | New description (max 10,000 chars)                                          |
+| `files`       | `string[]` | Replace file paths (max 50 items, 500 chars each)                           |
+| `phases`      | `string[]` | Replace phases (validated as subsequence of canonical order)                |
+| `blockedBy`   | `string[]` | Replace dependencies (max 20 items; triggers cycle check)                   |
+
+If `phases` is shortened such that `currentPhaseIndex` exceeds the new length, it is clamped to the last valid phase index.
+
+**Example:**
+
+```json
+{
+  "tool": "write_kanban",
+  "parameters": {
+    "mode": "edit",
+    "edits": [
+      {
+        "id": "kb-2",
+        "set": {
+          "description": "Updated: also cover PATCH endpoints for partial updates.",
+          "blockedBy": ["kb-1"]
+        }
+      },
+      {
+        "id": "kb-3",
+        "set": {
+          "phases": ["test", "implement", "review"]
+        }
+      }
+    ]
+  }
+}
+```
+
+---
+
+#### Mode: `delete`
+
+Removes tasks by ID. Automatically cleans up `blockedBy` references on remaining tasks that pointed to deleted tasks. All IDs are validated atomically — if any ID is not found, no tasks are deleted. Deleted IDs are **never reused**; the board's `nextId` counter only increases.
+
+**Parameters:**
+
+| Parameter | Type       | Required | Description                       |
+| --------- | ---------- | -------- | --------------------------------- |
+| `mode`    | `"delete"` | Yes      | Remove tasks                      |
+| `ids`     | `string[]` | Yes      | Task IDs to delete (1–50 items)   |
+
+**Example:**
+
+```json
+{
+  "tool": "write_kanban",
+  "parameters": {
+    "mode": "delete",
+    "ids": ["kb-2", "kb-5"]
+  }
+}
+```
+
+---
+
+#### TaskInput (for `replace` and `append` modes)
+
+| Field         | Type       | Required | Description                                                                                                |
+| ------------- | ---------- | -------- | ---------------------------------------------------------------------------------------------------------- |
+| `title`       | `string`   | Yes      | Short title (max 100 chars)                                                                                |
+| `description` | `string`   | Yes      | Detailed description for subagents (max 10,000 chars)                                                      |
+| `files`       | `string[]` | No       | Relevant file paths (max 50 items, 500 chars each)                                                         |
+| `phases`      | `string[]` | No       | Ordered subset of `test`, `implement`, `review`. Default: `["implement"]`                                  |
+| `blockedBy`   | `string[]` | No       | Task IDs or titles this task depends on (max 20 items). Titles are resolved to IDs when the board is created or tasks are appended. |
+
+#### Task ID assignment
+
+Task IDs are auto-assigned in `kb-N` sequential format:
+- In `replace` mode, IDs start at `kb-1`
+- In `append` mode, IDs continue from the board's `nextId` counter
+- Deleted IDs are never reused — the counter only increases
+- The `blockedBy` field accepts either IDs (e.g. `kb-3`) or titles (e.g. `"Set up database schema"`). Titles are resolved to IDs at board creation or append time.
+
 ### `list_kanban`
 
 Lists all tasks on the current board, grouped by status: claimed → ready → blocked → done.
@@ -112,7 +247,7 @@ Lists all tasks on the current board, grouped by status: claimed → ready → b
 }
 ```
 
-Returns the full board text or `"No board exists. Use create_kanban to create one."` if no board is active.
+Returns the full board text or `"No board exists. Use write_kanban to create one."` if no board is active.
 
 **Output format:**
 
@@ -189,7 +324,7 @@ All IDs are validated atomically — if any ID is invalid or not currently claim
 **Behavior per task:**
 
 - `currentPhaseIndex` increments by 1
-- If `currentPhaseIndex >= phases.length` → task is marked `done`
+- If `currentPhaseIndex >= phases.length` → task is marked `done` and its rejection reason (if any) is cleared
 - Otherwise → task stays `claimed` at the next phase (no need to re-claim)
 - For done tasks, all dependents are re-evaluated and unblocked if all their dependencies are satisfied
 
@@ -245,7 +380,7 @@ Both use the `kanban` key:
 | `profileMap` | `Record<string, string>` | `{ test: "task-worker-tests", implement: "task-worker", review: "task-reviewer" }` | Maps phase names to subagent profile names. Always merged on top of defaults. |
 | `maxClaims`  | `integer`                | `4`                                                                                | Maximum concurrent claimed tasks. Clamped to 1–10.                            |
 
-The `profileMap` can also be overridden per-board via the `profileMap` parameter in `create_kanban`. Merge order is: defaults → global settings → project settings → per-board parameter.
+The `profileMap` can also be overridden per-board via the `profileMap` parameter in `write_kanban`. Merge order is: defaults → global settings → project settings → per-board parameter.
 
 ## Phase Flow
 
@@ -269,7 +404,7 @@ Phases must be a subsequence of this order — for example `["implement"]`, `["i
                (unblocked when all blockers done)
 ```
 
-1. **Creation** — tasks with no `blockedBy` start as `ready`; tasks with unresolved dependencies start as `blocked`. Task IDs are auto-assigned as `kb-1`, `kb-2`, etc. in creation order.
+1. **Creation** — `write_kanban` (mode `replace`) creates the board. Tasks with no `blockedBy` start as `ready`; tasks with unresolved dependencies start as `blocked`. Task IDs are auto-assigned as `kb-1`, `kb-2`, etc. in creation order. Additional tasks can be added with mode `append`, edited with mode `edit`, or removed with mode `delete`.
 2. **Claiming** — `claim_tasks` moves `ready` tasks to `claimed` up to the `maxClaims` limit
 3. **Advancing** — `advance_tasks` increments the phase index. Tasks stay `claimed` through phase transitions. If past the last phase, the task becomes `done`
 4. **Rejecting** — `reject_tasks` resets the task to phase 0 and keeps it `claimed` (available at any phase, including the first)
@@ -290,8 +425,9 @@ A typical agent workflow:
 
 ```json
 {
-  "tool": "create_kanban",
+  "tool": "write_kanban",
   "parameters": {
+    "mode": "replace",
     "tasks": [
       {
         "title": "Design API schema",
@@ -354,7 +490,7 @@ Board state is event-sourced through tool result `details`. Every kanban tool re
 
 ```typescript
 {
-  action: "create" | "list" | "claim" | "advance" | "reject";
+  action: "write" | "list" | "claim" | "advance" | "reject";
   board: KanbanBoard | null;
   error?: string;
 }
@@ -368,7 +504,7 @@ On `session_start` and `session_tree` events, the extension scans the session br
 
 ## Powerline UI Integration
 
-The extension publishes real-time board status to the TUI after every board mutation (create, claim, advance, reject). This status is consumed by **pi-powerline** to display an at-a-glance view of the board above the composer.
+The extension publishes real-time board status to the TUI after every board mutation (write, claim, advance, reject). This status is consumed by **pi-powerline** to display an at-a-glance view of the board above the composer.
 
 The powerline display shows:
 

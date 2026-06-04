@@ -29,6 +29,15 @@ export function makeBoard(tasks: Task[] = [], overrides: Partial<KanbanBoard> = 
     profileMap: { ...DEFAULT_PROFILE_MAP },
     maxClaims: DEFAULT_MAX_CLAIMS,
     createdAt: Date.now(),
+    nextId:
+      tasks.length > 0
+        ? Math.max(
+            ...tasks.map((t) => {
+              const n = parseInt(t.id.slice(3), 10);
+              return Number.isNaN(n) ? 0 : n;
+            }),
+          ) + 1
+        : 1,
     ...overrides,
   };
 }
