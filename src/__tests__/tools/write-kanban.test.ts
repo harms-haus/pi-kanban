@@ -2,7 +2,7 @@ import { describe, it, expect, beforeEach } from "vitest";
 import type { Mock } from "vitest";
 import { writeKanbanTool } from "../../tools/write-kanban";
 import { resetState, getBoard } from "../../state";
-import { createMockContext } from "../helpers/mock-api";
+import { createMockContext, createMockTheme } from "../helpers/mock-api";
 import { noop, mockSignal } from "../helpers/test-board";
 
 type Phase = "test" | "implement" | "review";
@@ -161,6 +161,15 @@ describe("write_kanban — replace mode", () => {
     expect(result).toMatch(/cycle detected/i);
   });
 
+  it("throws for circular dependencies via replace blockedBy titles", async () => {
+    await expect(
+      replace([
+        { title: "A", description: "Task A", blockedBy: ["B"] },
+        { title: "B", description: "Task B", blockedBy: ["A"] },
+      ]),
+    ).rejects.toThrow(/cycle detected/i);
+  });
+
   it("throws for unresolvable blockedBy references", async () => {
     await expect(
       replace([
@@ -304,6 +313,12 @@ describe("write_kanban — append mode", () => {
     const taskA = board.tasks.find((t) => t.title === "Task A")!;
     expect(dependent.blockedBy).toEqual([taskA.id]);
     expect(dependent.status).toBe("blocked");
+  });
+
+  it("throws for unresolvable blockedBy reference in append", async () => {
+    await expect(
+      append([{ title: "Task", description: "Bad ref", blockedBy: ["Nonexistent"] }]),
+    ).rejects.toThrow(/cannot resolve blockedBy/i);
   });
 
   it("detects cycles across existing + new tasks", async () => {
@@ -523,6 +538,35 @@ describe("write_kanban — edit mode", () => {
     expect(board.tasks[1]!.title).toBe("Edited B");
   });
 
+  it("throws when no board exists in edit mode", async () => {
+    resetState();
+    await expect(edit([{ id: "kb-1", set: { title: "Nope" } }])).rejects.toThrow("No board exists");
+  });
+
+  it("rolls back all edits when blockedBy change creates a cycle", async () => {
+    await expect(
+      edit([
+        { id: "kb-1", set: { blockedBy: ["kb-2"] } },
+        { id: "kb-2", set: { blockedBy: ["kb-1"] } },
+      ]),
+    ).rejects.toThrow(/cycle detected/i);
+
+    // Verify rollback: both tasks should have their original blockedBy
+    const board = getBoard()!;
+    expect(board.tasks.find((t) => t.id === "kb-1")!.blockedBy).toEqual([]);
+    expect(board.tasks.find((t) => t.id === "kb-2")!.blockedBy).toEqual([]);
+  });
+
+  it("rolls back edits when blockedBy cannot be resolved", async () => {
+    await expect(edit([{ id: "kb-1", set: { blockedBy: ["Nonexistent"] } }])).rejects.toThrow(
+      /cannot resolve blockedBy/i,
+    );
+
+    // Verify rollback: kb-1 should have its original blockedBy
+    const board = getBoard()!;
+    expect(board.tasks.find((t) => t.id === "kb-1")!.blockedBy).toEqual([]);
+  });
+
   it("phase clamping when phases shrink below currentPhaseIndex", async () => {
     // First advance kb-2 to phase index 1 (review)
     // We can't use advance_tasks directly since kb-2 is "ready", not "claimed"
@@ -724,5 +768,27 @@ describe("write_kanban — delete mode", () => {
 
     const payload = JSON.parse((ctxWithUI.ui.setStatus as Mock).mock.calls[0]![1] as string);
     expect(payload.total).toBe(2);
+  });
+});
+
+// ═══════════════════════════════════════════════════════════════════════
+// EDGE CASES — unreachable default branches
+// ═══════════════════════════════════════════════════════════════════════
+
+describe("write_kanban — edge cases", () => {
+  beforeEach(() => {
+    resetState();
+  });
+
+  it("execute throws for unknown mode", async () => {
+    await expect(
+      tool.execute("call-1", { mode: "unknown" } as any, mockSignal, noop, mockCtx),
+    ).rejects.toThrow(/Unknown write_kanban mode/i);
+  });
+
+  it("renderCall returns fallback for unknown mode", () => {
+    const theme = createMockTheme();
+    const result = tool.renderCall!({ mode: "unknown" } as any, theme, {} as any);
+    expect(result).toBeDefined();
   });
 });
