@@ -91,18 +91,10 @@ export const VALID_STATUSES = new Set<TaskStatus>(["blocked", "ready", "claimed"
 
 // ── Lookup Maps ──
 
-/** Status → icon character */
-export const STATUS_ICONS: Record<TaskStatus, string> = {
-  blocked: "⊘",
-  ready: "○",
-  claimed: "●",
-  done: "✓",
-};
-
 /** Phase → icon character */
 export const PHASE_ICONS: Record<string, string> = {
   test: "🧪",
   implement: "⚙️",
   review: "👁",
-  done: "✓",
+  done: "✅",
 };

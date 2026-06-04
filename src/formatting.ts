@@ -8,7 +8,7 @@
 import { Text } from "@earendil-works/pi-tui";
 import type { Theme } from "@earendil-works/pi-coding-agent";
 import type { KanbanBoard, KanbanDetails, Task, TaskStatus } from "./types";
-import { STATUS_ICONS, PHASE_ICONS } from "./types";
+import { PHASE_ICONS } from "./types";
 
 // ── Plain-Text Formatting (for LLM content) ──
 
@@ -24,14 +24,13 @@ export function formatPhaseLabel(task: Task): string {
 /**
  * Formats a single task as plain text.
  *
- * Format: `{status_icon} {phase_icon} [{id}] {title} → {deps}` (deps optional)
+ * Format: `{phase_icon} [{id}] {title} → {deps}` (deps optional)
  */
 export function formatTaskText(task: Task): string {
-  const icon = STATUS_ICONS[task.status];
   const phaseLabel = formatPhaseLabel(task);
   const phaseIcon = PHASE_ICONS[phaseLabel] ?? "?";
   const deps = task.blockedBy.length > 0 ? ` → ${task.blockedBy.join(", ")}` : "";
-  return `${icon} ${phaseIcon} [${task.id}] ${task.title}${deps}`;
+  return `${phaseIcon} [${task.id}] ${task.title}${deps}`;
 }
 
 /**
@@ -95,22 +94,6 @@ export function formatClaimTaskDetail(task: Task): string {
 // ── Themed Formatting (for TUI rendering) ──
 
 /**
- * Maps a task status to a themed (colored) icon string.
- */
-export function getStatusIcon(status: TaskStatus, theme: Theme): string {
-  switch (status) {
-    case "blocked":
-      return theme.fg("error", STATUS_ICONS.blocked);
-    case "ready":
-      return theme.fg("success", STATUS_ICONS.ready);
-    case "claimed":
-      return theme.fg("warning", STATUS_ICONS.claimed);
-    case "done":
-      return theme.fg("dim", STATUS_ICONS.done);
-  }
-}
-
-/**
  * Maps a phase name to a themed emoji icon.
  *
  * Uses PHASE_ICONS lookup, falling back to a neutral icon for unknown phases.
@@ -124,7 +107,7 @@ export function getPhaseIcon(phase: string, theme: Theme): string {
 /**
  * Renders the full board as themed text for TUI display.
  *
- * Themed version of formatBoardText with colored status icons and phase icons.
+ * Themed version of formatBoardText with colored phase icons.
  */
 export function renderBoard(board: KanbanBoard, theme: Theme): string {
   const tasks = board.tasks;
@@ -155,7 +138,6 @@ export function renderBoard(board: KanbanBoard, theme: Theme): string {
     lines.push(theme.fg("accent", `── ${status.toUpperCase()} ──`));
 
     for (const task of group) {
-      const icon = getStatusIcon(task.status, theme);
       const shortId = task.id;
       const phaseLabel = formatPhaseLabel(task);
       const phaseIcon = getPhaseIcon(phaseLabel, theme);
@@ -169,9 +151,7 @@ export function renderBoard(board: KanbanBoard, theme: Theme): string {
       const depsStyled =
         task.blockedBy.length > 0 ? theme.fg("muted", ` → ${task.blockedBy.join(", ")}`) : "";
 
-      lines.push(
-        `${icon} ${phaseIcon} ${theme.fg("accent", `[${shortId}]`)} ${title}${depsStyled}`,
-      );
+      lines.push(`${phaseIcon} ${theme.fg("accent", `[${shortId}]`)} ${title}${depsStyled}`);
     }
   }
 

@@ -116,12 +116,11 @@ Returns the full board text or `"No board exists. Use create_kanban to create on
 
 **Output format:**
 
-Each line follows the pattern `{status_icon} {phase_icon} [{id}] {title} → {deps}`:
+Each line follows the pattern `{phase_icon} [{id}] {title} → {deps}`:
 
 | Element        | Meaning                                                                 |
 | -------------- | ----------------------------------------------------------------------- |
-| Status icon    | `⊘` blocked, `○` ready, `●` claimed, `✓` done                           |
-| Phase icon     | `🧪` test, `⚙️` implement, `👁` review, `✓` done                       |
+| Phase icon     | `🧪` test, `⚙️` implement, `👁` review, `✅` done                      |
 | Dependencies   | `→` followed by comma-separated blocker task IDs (omitted if none)      |
 
 **Example output:**
@@ -130,13 +129,13 @@ Each line follows the pattern `{status_icon} {phase_icon} [{id}] {title} → {de
 📋 Kanban Board — 3 total, 1 claimed, 1 ready, 0 blocked, 1 done
 
 ── CLAIMED ──
-● ⚙️ [kb-2] Implement endpoints → kb-1
+⚙️ [kb-2] Implement endpoints → kb-1
 
 ── READY ──
-○ 🧪 [kb-3] Write integration tests → kb-2
+🧪 [kb-3] Write integration tests → kb-2
 
 ── DONE ──
-✓ ✓ [kb-1] Design API schema
+✅ [kb-1] Design API schema
 ```
 
 ### `claim_tasks`
