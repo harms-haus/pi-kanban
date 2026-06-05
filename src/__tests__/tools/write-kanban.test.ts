@@ -788,7 +788,65 @@ describe("write_kanban — edge cases", () => {
 
   it("renderCall returns fallback for unknown mode", () => {
     const theme = createMockTheme();
-    const result = tool.renderCall!({ mode: "unknown" } as any, theme, {} as any);
+    const result = tool.renderCall!({ mode: "unknown" }, theme, {} as any);
     expect(result).toBeDefined();
+  });
+
+  it("renderCall handles replace/append with undefined tasks", () => {
+    const theme = createMockTheme();
+    const result = tool.renderCall!({ mode: "replace" }, theme, {} as any);
+    expect(result).toBeDefined();
+  });
+
+  it("renderCall handles edit with undefined edits", () => {
+    const theme = createMockTheme();
+    const result = tool.renderCall!({ mode: "edit" }, theme, {} as any);
+    expect(result).toBeDefined();
+  });
+
+  it("renderCall handles delete with undefined ids", () => {
+    const theme = createMockTheme();
+    const result = tool.renderCall!({ mode: "delete" }, theme, {} as any);
+    expect(result).toBeDefined();
+  });
+});
+
+// ═══════════════════════════════════════════════════════════════════════
+// MODE-SPECIFIC VALIDATION (flat schema)
+// ═══════════════════════════════════════════════════════════════════════
+
+describe("write_kanban — mode-specific validation", () => {
+  beforeEach(() => {
+    resetState();
+  });
+
+  it("replace mode without tasks throws", async () => {
+    await expect(
+      tool.execute("call-1", { mode: "replace" } as any, mockSignal, noop, mockCtx),
+    ).rejects.toThrow(/requires a non-empty 'tasks' array/);
+  });
+
+  it("replace mode with empty tasks throws", async () => {
+    await expect(
+      tool.execute("call-1", { mode: "replace", tasks: [] } as any, mockSignal, noop, mockCtx),
+    ).rejects.toThrow(/requires a non-empty 'tasks' array/);
+  });
+
+  it("append mode without tasks throws", async () => {
+    await expect(
+      tool.execute("call-1", { mode: "append" } as any, mockSignal, noop, mockCtx),
+    ).rejects.toThrow(/requires a non-empty 'tasks' array/);
+  });
+
+  it("edit mode without edits throws", async () => {
+    await expect(
+      tool.execute("call-1", { mode: "edit" } as any, mockSignal, noop, mockCtx),
+    ).rejects.toThrow(/requires a non-empty 'edits' array/);
+  });
+
+  it("delete mode without ids throws", async () => {
+    await expect(
+      tool.execute("call-1", { mode: "delete" } as any, mockSignal, noop, mockCtx),
+    ).rejects.toThrow(/requires a non-empty 'ids' array/);
   });
 });

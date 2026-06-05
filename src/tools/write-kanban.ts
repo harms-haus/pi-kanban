@@ -30,6 +30,20 @@ import { loadSettings } from "../settings";
 import { formatBoardText, renderToolResult } from "../formatting";
 import { publishKanbanStatus } from "../status";
 
+// ── Types ──
+
+/** Shape of a single task input (for replace/append modes) */
+type TaskInput = {
+  title: string;
+  description: string;
+  files?: string[];
+  phases?: string[];
+  blockedBy?: string[];
+};
+
+/** Shape of an edit entry */
+type EditInput = { id: string; set: Record<string, unknown> };
+
 // ── Schema ──
 
 const TaskInputSchema = Type.Object({
@@ -74,30 +88,35 @@ const EditEntrySchema = Type.Object({
   ),
 });
 
-const WriteKanbanParams = Type.Union([
-  // Replace mode
-  Type.Object({
-    mode: Type.Literal("replace"),
-    tasks: Type.Array(TaskInputSchema, { minItems: 1, maxItems: MAX_TASKS }),
-    profileMap: Type.Optional(Type.Record(Type.String(), Type.String())),
+const WriteKanbanParams = Type.Object({
+  mode: StringEnum(["replace", "append", "edit", "delete"], {
+    description:
+      "replace: Create a new board (errors if one already exists). append: Add tasks to an existing board. edit: Modify existing tasks. delete: Remove tasks by ID.",
   }),
-  // Append mode
-  Type.Object({
-    mode: Type.Literal("append"),
-    tasks: Type.Array(TaskInputSchema, { minItems: 1, maxItems: MAX_TASKS }),
-    profileMap: Type.Optional(Type.Record(Type.String(), Type.String())),
-  }),
-  // Edit mode
-  Type.Object({
-    mode: Type.Literal("edit"),
-    edits: Type.Array(EditEntrySchema, { minItems: 1, maxItems: MAX_IDS_IN_CALL }),
-  }),
-  // Delete mode
-  Type.Object({
-    mode: Type.Literal("delete"),
-    ids: Type.Array(Type.String(), { minItems: 1, maxItems: MAX_IDS_IN_CALL }),
-  }),
-]);
+  tasks: Type.Optional(
+    Type.Array(TaskInputSchema, {
+      maxItems: MAX_TASKS,
+      description: "Tasks to create/append. Required for replace and append modes.",
+    }),
+  ),
+  profileMap: Type.Optional(
+    Type.Record(Type.String(), Type.String(), {
+      description: "Override the default phase → subagent profile mapping.",
+    }),
+  ),
+  edits: Type.Optional(
+    Type.Array(EditEntrySchema, {
+      maxItems: MAX_IDS_IN_CALL,
+      description: "Edit entries. Required for edit mode.",
+    }),
+  ),
+  ids: Type.Optional(
+    Type.Array(Type.String(), {
+      maxItems: MAX_IDS_IN_CALL,
+      description: "Task IDs to delete. Required for delete mode.",
+    }),
+  ),
+});
 
 // ── Execute Logic ──
 
@@ -569,15 +588,35 @@ export function writeKanbanTool(): ToolDefinition<typeof WriteKanbanParams, Kanb
     ],
 
     async execute(_toolCallId, params, _signal, _onUpdate, ctx) {
+      // Validate mode-specific requirements (can't be expressed in flat schema)
+      if (
+        (params.mode === "replace" || params.mode === "append") &&
+        (!params.tasks || params.tasks.length === 0)
+      ) {
+        throw new Error(`Mode '${params.mode}' requires a non-empty 'tasks' array.`);
+      }
+      if (params.mode === "edit" && (!params.edits || params.edits.length === 0)) {
+        throw new Error("Mode 'edit' requires a non-empty 'edits' array.");
+      }
+      if (params.mode === "delete" && (!params.ids || params.ids.length === 0)) {
+        throw new Error("Mode 'delete' requires a non-empty 'ids' array.");
+      }
+
       switch (params.mode) {
         case "replace":
-          return executeReplace(params, ctx);
+          return executeReplace(
+            { tasks: params.tasks as TaskInput[], profileMap: params.profileMap },
+            ctx,
+          );
         case "append":
-          return executeAppend(params, ctx);
+          return executeAppend(
+            { tasks: params.tasks as TaskInput[], profileMap: params.profileMap },
+            ctx,
+          );
         case "edit":
-          return executeEdit(params, ctx);
+          return executeEdit({ edits: params.edits as EditInput[] }, ctx);
         case "delete":
-          return executeDelete(params, ctx);
+          return executeDelete({ ids: params.ids as string[] }, ctx);
         default:
           throw new Error(`Unknown write_kanban mode: ${(params as { mode: string }).mode}`);
       }
@@ -590,25 +629,25 @@ export function writeKanbanTool(): ToolDefinition<typeof WriteKanbanParams, Kanb
           return new Text(
             theme.fg(
               "accent",
-              `📋 write_kanban (mode: ${params.mode}, ${params.tasks.length} tasks)`,
+              `📋 write_kanban (mode: ${params.mode}, ${params.tasks?.length ?? 0} tasks)`,
             ),
             0,
             0,
           );
         case "edit":
           return new Text(
-            theme.fg("accent", `📋 write_kanban (mode: edit, ${params.edits.length} edits)`),
+            theme.fg("accent", `📋 write_kanban (mode: edit, ${params.edits?.length ?? 0} edits)`),
             0,
             0,
           );
         case "delete":
           return new Text(
-            theme.fg("accent", `📋 write_kanban (mode: delete, ${params.ids.length} ids)`),
+            theme.fg("accent", `📋 write_kanban (mode: delete, ${params.ids?.length ?? 0} ids)`),
             0,
             0,
           );
         default:
-          return new Text(theme.fg("accent", `📋 write_kanban`), 0, 0);
+          return new Text(theme.fg("accent", "📋 write_kanban"), 0, 0);
       }
     },
 
