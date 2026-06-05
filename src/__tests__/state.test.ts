@@ -5,14 +5,12 @@ import {
   resetState,
   getTaskById,
   getTasksByStatus,
-  resolveBlockedByTitles,
-  computeInitialStatuses,
-  unblockDependents,
   recomputeStatuses,
-  resolveTaskProfile,
-  reconstructState,
 } from "../state";
-import { makeTask, makeBoard } from "./helpers/test-data";
+import { resolveBlockedByTitles } from "../resolve-deps";
+import { resolveTaskProfile } from "../resolve-profile";
+import { reconstructState } from "../reconstruct";
+import { makeTask, makeBoard } from "./helpers/test-helpers";
 import { createMockContext } from "./helpers/mock-api";
 import { DEFAULT_PROFILE_MAP } from "../types";
 
@@ -256,91 +254,6 @@ describe("recomputeStatuses", () => {
     expect(taskC.status).toBe("ready");
     expect(taskD.status).toBe("claimed");
     expect(taskE.status).toBe("blocked");
-  });
-});
-
-// ── computeInitialStatuses ───────────────────────────────────────────
-
-describe("computeInitialStatuses", () => {
-  it('tasks with empty blockedBy get "ready"', () => {
-    const task = makeTask({ blockedBy: [], status: "blocked" });
-    const board = makeBoard([task]);
-    computeInitialStatuses(board);
-    expect(task.status).toBe("ready");
-  });
-
-  it('tasks with blockedBy entries get "blocked"', () => {
-    const task = makeTask({ blockedBy: ["some-id"], status: "ready" });
-    const board = makeBoard([task]);
-    computeInitialStatuses(board);
-    expect(task.status).toBe("blocked");
-  });
-
-  it("handles mixed tasks", () => {
-    const ready = makeTask({ id: "r1", blockedBy: [], status: "blocked" });
-    const blocked = makeTask({ id: "b1", blockedBy: ["r1"], status: "ready" });
-    const board = makeBoard([ready, blocked]);
-    computeInitialStatuses(board);
-    expect(ready.status).toBe("ready");
-    expect(blocked.status).toBe("blocked");
-  });
-});
-
-// ── unblockDependents ────────────────────────────────────────────────
-
-describe("unblockDependents", () => {
-  beforeEach(() => {
-    resetState();
-  });
-
-  it("when blocking task reaches done, dependent tasks become ready", () => {
-    const taskA = makeTask({ id: "A", status: "done" });
-    const taskB = makeTask({ id: "B", status: "blocked", blockedBy: ["A"] });
-    setBoard(makeBoard([taskA, taskB]));
-
-    unblockDependents("A");
-    expect(taskB.status).toBe("ready");
-  });
-
-  it("tasks with multiple blockers only unblock when ALL are done", () => {
-    const taskA = makeTask({ id: "A", status: "done" });
-    const taskB = makeTask({ id: "B", status: "done" });
-    const taskC = makeTask({ id: "C", status: "blocked", blockedBy: ["A", "B"] });
-
-    // Only A is done — C stays blocked
-    setBoard(makeBoard([taskA, makeTask({ id: "B", status: "ready" }), taskC]));
-    unblockDependents("A");
-    expect(taskC.status).toBe("blocked");
-
-    // Now both A and B are done — C unblocks
-    setBoard(makeBoard([taskA, taskB, taskC]));
-    unblockDependents("B");
-    expect(taskC.status).toBe("ready");
-  });
-
-  it("does not modify non-blocked tasks", () => {
-    const taskA = makeTask({ id: "A", status: "done" });
-    const taskB = makeTask({ id: "B", status: "claimed", blockedBy: ["A"] });
-    setBoard(makeBoard([taskA, taskB]));
-
-    unblockDependents("A");
-    expect(taskB.status).toBe("claimed");
-  });
-
-  it("handles tasks with no blockedBy becoming ready", () => {
-    const taskA = makeTask({ id: "A", status: "done" });
-    const taskB = makeTask({ id: "B", status: "blocked", blockedBy: [] });
-    setBoard(makeBoard([taskA, taskB]));
-
-    unblockDependents("A");
-    expect(taskB.status).toBe("ready");
-  });
-
-  it("does nothing when no board is set", () => {
-    // Should not throw
-    expect(() => {
-      unblockDependents("some-id");
-    }).not.toThrow();
   });
 });
 
@@ -664,7 +577,6 @@ describe("reconstructState", () => {
     const ctx = createMockContext({
       sessionManager: {
         getBranch: () => [
-          { type: "other", message: null },
           {
             type: "message",
             message: {
@@ -676,6 +588,7 @@ describe("reconstructState", () => {
               },
             },
           },
+          { type: "other", message: null },
         ],
       },
     });
@@ -735,7 +648,6 @@ describe("reconstructState", () => {
 
   it("recognizes all TOOL_NAMES (create, write, list, claim, advance, reject)", () => {
     const toolNames = [
-      "create_kanban",
       "write_kanban",
       "list_kanban",
       "claim_tasks",

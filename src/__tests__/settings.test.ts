@@ -207,6 +207,15 @@ describe("settings", () => {
       // Should fall back to default
       expect(result.maxClaims).toBe(DEFAULT_MAX_CLAIMS);
     });
+
+    it("returns defaults when settings file contains malformed JSON", async () => {
+      vi.mocked(readFile).mockResolvedValue("not valid json {{{");
+
+      const result = await loadSettings();
+
+      expect(result.profileMap).toEqual(DEFAULT_PROFILE_MAP);
+      expect(result.maxClaims).toBe(DEFAULT_MAX_CLAIMS);
+    });
   });
 
   // ── resolveProfile ──

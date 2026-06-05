@@ -3,7 +3,7 @@ import type { Mock } from "vitest";
 import { writeKanbanTool } from "../../tools/write-kanban";
 import { resetState, getBoard } from "../../state";
 import { createMockContext, createMockTheme } from "../helpers/mock-api";
-import { noop, mockSignal } from "../helpers/test-board";
+import { noop, mockSignal } from "../helpers/test-helpers";
 
 type Phase = "test" | "implement" | "review";
 

@@ -1,8 +1,8 @@
 import { describe, it, expect, beforeEach } from "vitest";
 import { createListKanbanTool } from "../../tools/list-kanban";
 import { resetState, setBoard, getBoard } from "../../state";
-import { createMockContext } from "../helpers/mock-api";
-import { makeTask, makeBoard, noop, mockSignal } from "../helpers/test-board";
+import { createMockContext, createMockTheme } from "../helpers/mock-api";
+import { makeTask, makeBoard, noop, mockSignal } from "../helpers/test-helpers";
 
 const tool = createListKanbanTool();
 const mockCtx = createMockContext();
@@ -46,6 +46,16 @@ describe("list_kanban tool", () => {
     expect(result.details.action).toBe("list");
     expect(result.details.board).not.toBeNull();
     expect(result.details.board!.tasks).toHaveLength(2);
+  });
+
+  // ── renderCall ──
+
+  it("renderCall returns themed text with tool name", () => {
+    const theme = createMockTheme();
+    const result = tool.renderCall!({}, theme, {} as any);
+    expect(result).toBeDefined();
+    const lines = result.render(80);
+    expect(lines.join("\n")).toContain("list_kanban");
   });
 
   it("does not modify state", async () => {

@@ -3,7 +3,7 @@ import type { Mock } from "vitest";
 import { createAdvanceTasksTool } from "../../tools/advance-tasks";
 import { resetState, getBoard } from "../../state";
 import { createMockContext } from "../helpers/mock-api";
-import { makeTask, setupBoard, noop, mockSignal } from "../helpers/test-board";
+import { makeTask, setupBoard, noop, mockSignal } from "../helpers/test-helpers";
 
 const tool = createAdvanceTasksTool();
 const mockCtx = createMockContext();

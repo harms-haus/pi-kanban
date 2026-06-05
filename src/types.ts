@@ -78,7 +78,6 @@ export const DEFAULT_MAX_CLAIMS = 4;
 
 /** Tool names that produce KanbanDetails for state reconstruction */
 export const TOOL_NAMES = new Set([
-  "create_kanban",
   "write_kanban",
   "list_kanban",
   "claim_tasks",

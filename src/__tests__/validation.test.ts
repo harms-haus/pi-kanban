@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { isValidTask, validatePhases, detectCycles, cloneBoard } from "../validation";
-import { makeTask, makeBoard } from "./helpers/test-data";
+import { makeTask, makeBoard } from "./helpers/test-helpers";
 import { MAX_TITLE_LENGTH } from "../types";
 
 // ── isValidTask ──────────────────────────────────────────────────────

@@ -1,12 +1,18 @@
 import { Type } from "typebox";
 import { Text } from "@earendil-works/pi-tui";
-import type { Theme, ToolDefinition, ExtensionContext } from "@earendil-works/pi-coding-agent";
+import type {
+  Theme,
+  ToolDefinition,
+  ExtensionContext,
+  AgentToolUpdateCallback,
+} from "@earendil-works/pi-coding-agent";
 import type { KanbanDetails } from "../types";
 import { MAX_IDS_IN_CALL } from "../types";
-import { getBoard, getTaskById, unblockDependents, resolveTaskProfile } from "../state";
-import { cloneBoard } from "../validation";
+import { recomputeStatuses } from "../state";
+import { resolveTaskProfile } from "../resolve-profile";
 import { formatBoardText, renderToolResult } from "../formatting";
-import { publishKanbanStatus } from "../status";
+import { deduplicateIds, finishMutation } from "../helpers";
+import { requireBoard } from "../guard";
 
 // ── Schema Builder ──
 
@@ -49,21 +55,19 @@ export function createAdvanceTasksTool(): ToolDefinition<
       _toolCallId: string,
       executeParams: { ids: string[] },
       _signal: AbortSignal | undefined,
-      _onUpdate: unknown,
+      _onUpdate: AgentToolUpdateCallback<KanbanDetails> | undefined,
       ctx: ExtensionContext,
     ) {
-      const board = getBoard();
-      if (!board) {
-        throw new Error("No board exists. Use write_kanban to create one.");
-      }
+      const board = requireBoard();
 
       // Deduplicate IDs
-      const uniqueIds = [...new Set(executeParams.ids)];
+      const uniqueIds = deduplicateIds(executeParams.ids);
 
       // ── Atomic Validation ──
+      const taskMap = new Map(board.tasks.map((t) => [t.id, t]));
       const errors: string[] = [];
       for (const id of uniqueIds) {
-        const task = getTaskById(id);
+        const task = taskMap.get(id);
         if (!task) {
           errors.push(`task "${id}" not found`);
         } else if (task.status !== "claimed") {
@@ -80,8 +84,9 @@ export function createAdvanceTasksTool(): ToolDefinition<
       const completed: string[] = [];
 
       for (const id of uniqueIds) {
-        // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- validated atomically above
-        const task = getTaskById(id)!;
+        // Validated atomically above — existence guaranteed
+        const task = taskMap.get(id);
+        if (!task) continue;
 
         task.currentPhaseIndex++;
         const shortId = task.id;
@@ -102,16 +107,8 @@ export function createAdvanceTasksTool(): ToolDefinition<
         }
       }
 
-      // ── Unblock Dependents for Done Tasks ──
-      for (const id of uniqueIds) {
-        const task = getTaskById(id);
-        if (task && task.status === "done") {
-          unblockDependents(task.id);
-        }
-      }
-
-      // Publish status to UI
-      publishKanbanStatus(board, ctx);
+      // ── Unblock Dependents ──
+      recomputeStatuses(board);
 
       // ── Build Content ──
       const lines: string[] = [];
@@ -124,12 +121,7 @@ export function createAdvanceTasksTool(): ToolDefinition<
       lines.push("");
       lines.push(formatBoardText(board));
 
-      const text = lines.join("\n");
-
-      return {
-        content: [{ type: "text" as const, text }],
-        details: { action: "advance" as const, board: cloneBoard(board) },
-      };
+      return finishMutation(board, ctx, "advance", lines.join("\n"));
     },
 
     renderCall(args: { ids: string[] }, theme: Theme) {

@@ -13,7 +13,8 @@
 
 import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
 import { Text } from "@earendil-works/pi-tui";
-import { getBoard, setBoard, resetState, reconstructState } from "./state";
+import { getBoard, setBoard, resetState } from "./state";
+import { reconstructState } from "./reconstruct";
 import { formatBoardText } from "./formatting";
 import { writeKanbanTool } from "./tools/write-kanban";
 import { createListKanbanTool } from "./tools/list-kanban";

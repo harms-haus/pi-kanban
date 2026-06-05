@@ -6,7 +6,7 @@
 
 import { Text } from "@earendil-works/pi-tui";
 import { Type } from "typebox";
-import type { ToolDefinition } from "@earendil-works/pi-coding-agent";
+import type { ToolDefinition, AgentToolUpdateCallback } from "@earendil-works/pi-coding-agent";
 import type { KanbanDetails } from "../types";
 import { getBoard } from "../state";
 import { cloneBoard } from "../validation";
@@ -32,7 +32,13 @@ export function createListKanbanTool(): ToolDefinition<typeof ListKanbanParams, 
     ],
 
     // eslint-disable-next-line @typescript-eslint/require-await
-    async execute(_toolCallId, _params, _signal, _onUpdate, _ctx) {
+    async execute(
+      _toolCallId,
+      _params,
+      _signal,
+      _onUpdate: AgentToolUpdateCallback<KanbanDetails> | undefined,
+      _ctx,
+    ) {
       const board = getBoard();
 
       if (board === null) {

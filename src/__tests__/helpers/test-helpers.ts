@@ -1,17 +1,14 @@
+import { resetState, setBoard } from "../../state";
 import type { KanbanBoard, Task } from "../../types";
 import { DEFAULT_PROFILE_MAP, DEFAULT_MAX_CLAIMS } from "../../types";
 
 let taskCounter = 0;
 
-export function resetTestCounters(): void {
-  taskCounter = 0;
-}
-
 export function makeTask(overrides: Partial<Task> = {}): Task {
   return {
     id: `kb-${++taskCounter}`,
     title: "Test task",
-    description: "A test task description",
+    description: "Test description for the task",
     files: [],
     phases: ["implement"],
     currentPhaseIndex: 0,
@@ -40,3 +37,13 @@ export function makeBoard(tasks: Task[] = [], overrides: Partial<KanbanBoard> = 
     ...overrides,
   };
 }
+
+export function setupBoard(tasks: Task[], overrides: Partial<KanbanBoard> = {}): KanbanBoard {
+  resetState();
+  const board = makeBoard(tasks, overrides);
+  setBoard(board);
+  return board;
+}
+
+export function noop(): void {}
+export const mockSignal = new AbortController().signal;

@@ -16,14 +16,18 @@ vi.mock("../state", () => ({
   getBoard: vi.fn(),
   setBoard: vi.fn(),
   resetState: vi.fn(),
+}));
+
+vi.mock("../reconstruct", () => ({
   reconstructState: vi.fn(),
 }));
 
 // Import after mocks are set up
 import extensionFactory from "../index";
-import { getBoard, setBoard, resetState, reconstructState } from "../state";
-import { createMockAPI, createMockContext } from "./helpers/mock-api";
-import { makeTask, makeBoard } from "./helpers/test-data";
+import { getBoard, setBoard, resetState } from "../state";
+import { reconstructState } from "../reconstruct";
+import { createMockAPI, createMockContext, createMockTheme } from "./helpers/mock-api";
+import { makeTask, makeBoard } from "./helpers/test-helpers";
 
 // ── Helpers ──
 
@@ -84,6 +88,121 @@ describe("default export (extension factory)", () => {
     const { api, capturedRenderers } = createMockAPI();
     extensionFactory(api);
     expect(capturedRenderers.has("kanban-context")).toBe(true);
+  });
+
+  // ── Message Renderer Tests ──
+
+  describe("kanban-context message renderer", () => {
+    /** Build a minimal CustomMessage shape for renderer calls. */
+    function customMsg(content: string | Array<{ type: "text"; text: string }>) {
+      return {
+        role: "custom" as const,
+        customType: "kanban-context",
+        content,
+        display: false,
+        timestamp: Date.now(),
+      };
+    }
+
+    it("with string content → renders first line with clipboard emoji", () => {
+      const { api, capturedRenderers } = createMockAPI();
+      extensionFactory(api);
+      const renderer = capturedRenderers.get("kanban-context")!;
+      const theme = createMockTheme();
+
+      const result = renderer(customMsg("first line\nsecond line"), { expanded: false }, theme);
+
+      expect(result).toBeDefined();
+      const lines = result!.render(80);
+      expect(lines).toHaveLength(1);
+      expect(lines[0]).toContain("📋 first line");
+    });
+
+    it("with array content → renders first text element with clipboard emoji", () => {
+      const { api, capturedRenderers } = createMockAPI();
+      extensionFactory(api);
+      const renderer = capturedRenderers.get("kanban-context")!;
+      const theme = createMockTheme();
+
+      const result = renderer(
+        customMsg([{ type: "text", text: "hello" }]),
+        { expanded: false },
+        theme,
+      );
+
+      expect(result).toBeDefined();
+      const lines = result!.render(80);
+      expect(lines).toHaveLength(1);
+      expect(lines[0]).toContain("📋 hello");
+    });
+
+    it("with empty string → renders clipboard emoji with empty first line", () => {
+      const { api, capturedRenderers } = createMockAPI();
+      extensionFactory(api);
+      const renderer = capturedRenderers.get("kanban-context")!;
+      const theme = createMockTheme();
+
+      const result = renderer(customMsg(""), { expanded: false }, theme);
+
+      expect(result).toBeDefined();
+      const lines = result!.render(80);
+      expect(lines).toHaveLength(1);
+      expect(lines[0]).toBe("📋 ");
+    });
+
+    it("uses only the first line of string content with multiple lines", () => {
+      const { api, capturedRenderers } = createMockAPI();
+      extensionFactory(api);
+      const renderer = capturedRenderers.get("kanban-context")!;
+      const theme = createMockTheme();
+
+      const result = renderer(
+        customMsg("line one\nline two\nline three"),
+        { expanded: false },
+        theme,
+      );
+
+      const lines = result!.render(80);
+      expect(lines).toHaveLength(1);
+      expect(lines[0]).toContain("📋 line one");
+      expect(lines[0]).not.toContain("line two");
+    });
+
+    it("uses only the first line of text in array content", () => {
+      const { api, capturedRenderers } = createMockAPI();
+      extensionFactory(api);
+      const renderer = capturedRenderers.get("kanban-context")!;
+      const theme = createMockTheme();
+
+      const result = renderer(
+        customMsg([{ type: "text", text: "first\nsecond" }]),
+        { expanded: false },
+        theme,
+      );
+
+      const lines = result!.render(80);
+      expect(lines).toHaveLength(1);
+      expect(lines[0]).toContain("📋 first");
+      expect(lines[0]).not.toContain("second");
+    });
+
+    it("falls back to empty first line when array content has no text type", () => {
+      const { api, capturedRenderers } = createMockAPI();
+      extensionFactory(api);
+      const renderer = capturedRenderers.get("kanban-context")!;
+      const theme = createMockTheme();
+
+      const result = renderer(
+        // @ts-expect-error — testing non-text content type
+        customMsg([{ type: "image", data: "foo", mimeType: "image/png" }]),
+        { expanded: false },
+        theme,
+      );
+
+      const lines = result!.render(80);
+      expect(lines).toHaveLength(1);
+      expect(lines[0]).toBe("📋 ");
+    });
   });
 
   // ── session_start Handler ──

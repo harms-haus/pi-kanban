@@ -3,7 +3,7 @@ import type { Mock } from "vitest";
 import { publishKanbanStatus, type KanbanStatusPayload } from "../status";
 import { resetState } from "../state";
 import { createMockContext } from "./helpers/mock-api";
-import { makeTask, setupBoard } from "./helpers/test-board";
+import { makeTask, setupBoard } from "./helpers/test-helpers";
 
 describe("publishKanbanStatus", () => {
   beforeEach(() => {

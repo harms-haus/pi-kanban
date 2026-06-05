@@ -6,12 +6,18 @@
 
 import { Text } from "@earendil-works/pi-tui";
 import { Type } from "typebox";
-import type { Theme, ToolDefinition, ExtensionContext } from "@earendil-works/pi-coding-agent";
+import type {
+  Theme,
+  ToolDefinition,
+  ExtensionContext,
+  AgentToolUpdateCallback,
+} from "@earendil-works/pi-coding-agent";
 import type { KanbanDetails } from "../types";
-import { getBoard, getTasksByStatus, resolveTaskProfile } from "../state";
-import { cloneBoard } from "../validation";
+import { getTasksByStatus } from "../state";
+import { resolveTaskProfile } from "../resolve-profile";
 import { formatClaimTaskDetail, formatBoardText, renderToolResult } from "../formatting";
-import { publishKanbanStatus } from "../status";
+import { finishMutation } from "../helpers";
+import { requireBoard } from "../guard";
 
 // ── Schema ──
 
@@ -42,13 +48,10 @@ export function createClaimTasksTool(): ToolDefinition<typeof ClaimTasksParams, 
       _toolCallId: string,
       params: { count: number },
       _signal: AbortSignal | undefined,
-      _onUpdate: undefined,
+      _onUpdate: AgentToolUpdateCallback<KanbanDetails> | undefined,
       ctx: ExtensionContext,
     ) {
-      const board = getBoard();
-      if (!board) {
-        throw new Error("No board exists. Use write_kanban to create one.");
-      }
+      const board = requireBoard();
 
       const outstanding = getTasksByStatus("claimed");
       const ready = getTasksByStatus("ready");
@@ -97,13 +100,7 @@ export function createClaimTasksTool(): ToolDefinition<typeof ClaimTasksParams, 
         text = parts.join("\n");
       }
 
-      // Publish status to UI
-      publishKanbanStatus(board, ctx);
-
-      return {
-        content: [{ type: "text" as const, text }],
-        details: { action: "claim" as const, board: cloneBoard(board) },
-      };
+      return finishMutation(board, ctx, "claim", text);
     },
 
     renderCall(params: { count: number }, theme: Theme) {

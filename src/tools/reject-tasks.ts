@@ -7,12 +7,16 @@
 
 import { Type } from "typebox";
 import { Text } from "@earendil-works/pi-tui";
-import type { Theme, ToolDefinition, AgentToolResult } from "@earendil-works/pi-coding-agent";
-import { MAX_IDS_IN_CALL, type KanbanBoard, type KanbanDetails } from "../types";
-import { getBoard, getTaskById, resolveTaskProfile } from "../state";
-import { cloneBoard } from "../validation";
+import type {
+  Theme,
+  ToolDefinition,
+  AgentToolUpdateCallback,
+} from "@earendil-works/pi-coding-agent";
+import { MAX_IDS_IN_CALL, type KanbanDetails } from "../types";
+import { resolveTaskProfile } from "../resolve-profile";
 import { formatTaskText, formatBoardText, renderToolResult } from "../formatting";
-import { publishKanbanStatus } from "../status";
+import { deduplicateIds, finishMutation } from "../helpers";
+import { requireBoard } from "../guard";
 
 // ── Schema ──
 
@@ -26,22 +30,6 @@ const RejectTasksParams = Type.Object({
 });
 
 type RejectTasksParamsType = typeof RejectTasksParams;
-
-// ── Build Error Result ──
-
-function rejectErrorResult(
-  board: KanbanBoard | null,
-  errorText: string,
-): AgentToolResult<KanbanDetails> {
-  return {
-    content: [{ type: "text" as const, text: errorText }],
-    details: {
-      action: "reject" as const,
-      board: board ? cloneBoard(board) : null,
-      error: errorText,
-    },
-  };
-}
 
 // ── Tool Factory ──
 
@@ -59,23 +47,21 @@ export function createRejectTasksTool(): ToolDefinition<RejectTasksParamsType, K
       _toolCallId,
       params,
       _signal,
-      _onUpdate,
+      _onUpdate: AgentToolUpdateCallback<KanbanDetails> | undefined,
       ctx,
-    ): Promise<AgentToolResult<KanbanDetails>> {
+    ) {
       // 1. Board must exist
-      const board = getBoard();
-      if (!board) {
-        return rejectErrorResult(null, "No board exists. Use write_kanban to create one.");
-      }
+      const board = requireBoard();
 
       // 2. Deduplicate IDs
-      const uniqueIds = [...new Set(params.ids)];
+      const uniqueIds = deduplicateIds(params.ids);
 
       // 3. Atomic validation — check ALL IDs before any changes
+      const taskMap = new Map(board.tasks.map((t) => [t.id, t]));
       const errors: string[] = [];
 
       for (const id of uniqueIds) {
-        const task = getTaskById(id);
+        const task = taskMap.get(id);
         if (!task) {
           errors.push(`task "${id}" not found`);
           continue;
@@ -87,27 +73,26 @@ export function createRejectTasksTool(): ToolDefinition<RejectTasksParamsType, K
       }
 
       if (errors.length > 0) {
-        return rejectErrorResult(board, `Cannot reject: ${errors.join("; ")}`);
+        throw new Error(`Cannot reject: ${errors.join("; ")}`);
       }
 
       // 4. Apply changes atomically (all validations passed)
       for (const id of uniqueIds) {
-        // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
-        const task = getTaskById(id)!;
+        // Validated atomically above — existence guaranteed
+        const task = taskMap.get(id);
+        if (!task) continue;
         task.currentPhaseIndex = 0;
         task.status = "claimed";
         task.profile = resolveTaskProfile(task, board.profileMap);
         task.reason = params.reason ?? undefined;
       }
 
-      // 5. Publish status to UI
-      publishKanbanStatus(board, ctx);
-
-      // 6. Build content: per-task rejection info + board summary
+      // 5. Build content: per-task rejection info + board summary
       const lines: string[] = [];
       for (const id of uniqueIds) {
-        // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
-        const task = getTaskById(id)!;
+        // Validated atomically above — existence guaranteed
+        const task = taskMap.get(id);
+        if (!task) continue;
         const line = params.reason
           ? `↩ Rejected: ${formatTaskText(task)} (reason: ${params.reason})`
           : `↩ Rejected: ${formatTaskText(task)}`;
@@ -116,13 +101,7 @@ export function createRejectTasksTool(): ToolDefinition<RejectTasksParamsType, K
       lines.push("");
       lines.push(formatBoardText(board));
 
-      return {
-        content: [{ type: "text" as const, text: lines.join("\n") }],
-        details: {
-          action: "reject" as const,
-          board: cloneBoard(board),
-        },
-      };
+      return finishMutation(board, ctx, "reject", lines.join("\n"));
     },
 
     renderCall(args: { ids: string[]; reason?: string }, theme: Theme): Text {

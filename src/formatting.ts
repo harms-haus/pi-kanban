@@ -10,6 +10,24 @@ import type { Theme } from "@earendil-works/pi-coding-agent";
 import type { KanbanBoard, KanbanDetails, Task, TaskStatus } from "./types";
 import { PHASE_ICONS } from "./types";
 
+// ── Helpers ──
+
+/**
+ * Groups tasks into arrays by their status.
+ */
+function groupTasksByStatus(tasks: Task[]): {
+  claimed: Task[];
+  ready: Task[];
+  blocked: Task[];
+  done: Task[];
+} {
+  const groups: { [K in TaskStatus]: Task[] } = { claimed: [], ready: [], blocked: [], done: [] };
+  for (const t of tasks) {
+    groups[t.status].push(t);
+  }
+  return groups;
+}
+
 // ── Plain-Text Formatting (for LLM content) ──
 
 /**
@@ -44,10 +62,7 @@ export function formatBoardText(board: KanbanBoard): string {
   if (tasks.length === 0) return "No tasks on the board.";
 
   const total = tasks.length;
-  const groups: { [K in TaskStatus]: Task[] } = { claimed: [], ready: [], blocked: [], done: [] };
-  for (const t of tasks) {
-    groups[t.status].push(t);
-  }
+  const groups = groupTasksByStatus(tasks);
   const { claimed, ready, blocked, done } = groups;
 
   const statusOrder: TaskStatus[] = ["claimed", "ready", "blocked", "done"];
@@ -114,10 +129,7 @@ export function renderBoard(board: KanbanBoard, theme: Theme): string {
   if (tasks.length === 0) return theme.fg("dim", "No tasks on the board.");
 
   const total = tasks.length;
-  const groups: { [K in TaskStatus]: Task[] } = { claimed: [], ready: [], blocked: [], done: [] };
-  for (const t of tasks) {
-    groups[t.status].push(t);
-  }
+  const groups = groupTasksByStatus(tasks);
   const { claimed, ready, blocked, done } = groups;
 
   const statusOrder: TaskStatus[] = ["claimed", "ready", "blocked", "done"];

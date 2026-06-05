@@ -2,8 +2,8 @@ import { describe, it, expect, beforeEach } from "vitest";
 import type { Mock } from "vitest";
 import { createRejectTasksTool } from "../../tools/reject-tasks";
 import { resetState, getBoard } from "../../state";
-import { createMockContext } from "../helpers/mock-api";
-import { makeTask, setupBoard, noop, mockSignal } from "../helpers/test-board";
+import { createMockContext, createMockTheme } from "../helpers/mock-api";
+import { makeTask, setupBoard, noop, mockSignal } from "../helpers/test-helpers";
 
 const tool = createRejectTasksTool();
 const mockCtx = createMockContext();
@@ -93,7 +93,6 @@ describe("reject_tasks tool", () => {
       type: "text",
       text: expect.stringContaining("Rejected"),
     });
-    expect(result.details.error).toBeUndefined();
 
     // State: phase stays 0, status stays claimed, reason recorded
     const board = getBoard()!;
@@ -102,17 +101,13 @@ describe("reject_tasks tool", () => {
     expect(board.tasks[0]!.reason).toBe("Needs rework");
   });
 
-  it("returns error for non-claimed tasks", async () => {
+  it("throws for non-claimed tasks", async () => {
     const t1 = makeTask({ title: "Task A", status: "ready" });
     setupBoard([t1]);
 
-    const result = await tool.execute("call-1", { ids: [t1.id] }, mockSignal, noop, mockCtx);
-
-    expect(result.content[0]).toMatchObject({
-      type: "text",
-      text: expect.stringContaining("not claimed"),
-    });
-    expect(result.details.error).toContain("not claimed");
+    await expect(
+      tool.execute("call-1", { ids: [t1.id] }, mockSignal, noop, mockCtx),
+    ).rejects.toThrow("not claimed");
   });
 
   it("atomic: no partial changes on error", async () => {
@@ -130,10 +125,9 @@ describe("reject_tasks tool", () => {
     });
     setupBoard([t1, t2]);
 
-    const result = await tool.execute("call-1", { ids: [t1.id, t2.id] }, mockSignal, noop, mockCtx);
-
-    // Should return error result
-    expect(result.details.error).toBeDefined();
+    await expect(
+      tool.execute("call-1", { ids: [t1.id, t2.id] }, mockSignal, noop, mockCtx),
+    ).rejects.toThrow();
 
     // t1 should be unchanged
     const board = getBoard()!;
@@ -141,7 +135,7 @@ describe("reject_tasks tool", () => {
     expect(board.tasks[0]!.status).toBe("claimed");
   });
 
-  it("returns error for non-existent IDs", async () => {
+  it("throws for non-existent IDs", async () => {
     const t1 = makeTask({
       title: "Task A",
       phases: ["implement", "review"],
@@ -150,27 +144,15 @@ describe("reject_tasks tool", () => {
     });
     setupBoard([t1]);
 
-    const result = await tool.execute(
-      "call-1",
-      { ids: ["nonexistent-id"] },
-      mockSignal,
-      noop,
-      mockCtx,
-    );
-
-    expect(result.content[0]).toMatchObject({
-      type: "text",
-      text: expect.stringContaining("not found"),
-    });
+    await expect(
+      tool.execute("call-1", { ids: ["nonexistent-id"] }, mockSignal, noop, mockCtx),
+    ).rejects.toThrow("not found");
   });
 
-  it("returns error when no board exists", async () => {
-    const result = await tool.execute("call-1", { ids: ["any-id"] }, mockSignal, noop, mockCtx);
-
-    expect(result.content[0]).toMatchObject({
-      type: "text",
-      text: expect.stringContaining("No board exists"),
-    });
+  it("throws when no board exists", async () => {
+    await expect(
+      tool.execute("call-1", { ids: ["any-id"] }, mockSignal, noop, mockCtx),
+    ).rejects.toThrow("No board exists");
   });
 
   it("publishes kanban status to UI on success", async () => {
@@ -193,6 +175,35 @@ describe("reject_tasks tool", () => {
     expect(payload.total).toBe(1);
     expect(payload.claimed).toBe(1);
     expect(payload.claimedTasks[0]!.phase).toBe("implement");
+  });
+
+  // ── renderCall ──
+
+  it("renderCall returns themed text with tool name and count", () => {
+    const theme = createMockTheme();
+    const result = tool.renderCall!({ ids: ["kb-1", "kb-2"] }, theme, {} as any);
+    expect(result).toBeDefined();
+    const lines = result.render(80);
+    expect(lines.join("\n")).toContain("reject_tasks");
+    expect(lines.join("\n")).toContain("2");
+  });
+
+  it("renderCall includes reason when provided", () => {
+    const theme = createMockTheme();
+    const result = tool.renderCall!({ ids: ["kb-1"], reason: "Needs rework" }, theme, {} as any);
+    expect(result).toBeDefined();
+    const lines = result.render(80);
+    expect(lines.join("\n")).toContain("Needs rework");
+  });
+
+  it("renderCall omits reason when not provided", () => {
+    const theme = createMockTheme();
+    const result = tool.renderCall!({ ids: ["kb-1"] }, theme, {} as any);
+    expect(result).toBeDefined();
+    const lines = result.render(80);
+    expect(lines.join("\n")).toContain("reject_tasks");
+    // No reason text should be appended
+    expect(lines.join("\n")).not.toContain("Needs rework");
   });
 
   it("details contain board snapshot on success", async () => {

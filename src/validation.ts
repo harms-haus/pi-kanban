@@ -17,7 +17,7 @@ function isNonEmptyString(value: unknown): value is string {
 /** Type guard: checks that value is a valid Phase. */
 function isValidPhase(value: unknown): value is Phase {
   if (typeof value !== "string") return false;
-  return (VALID_PHASES as ReadonlySet<string>).has(value);
+  return VALID_PHASES.has(value as Phase);
 }
 
 /** Type guard: checks that value is a valid TaskStatus. */
@@ -136,7 +136,7 @@ export function validatePhases(
     if (typeof raw !== "string") {
       return { valid: false, error: `invalid phase: ${String(raw)}` };
     }
-    if (!(VALID_PHASES as ReadonlySet<string>).has(raw)) {
+    if (!VALID_PHASES.has(raw as Phase)) {
       return { valid: false, error: `invalid phase: ${raw}` };
     }
 
@@ -156,8 +156,7 @@ export function validatePhases(
     allIndex++; // Move past this match so next phase must come after
   }
 
-  // Cast through unknown since string[] → Phase[] is a narrowing cast
-  return { valid: true, phases: strings } as unknown as ReturnType<typeof validatePhases>;
+  return { valid: true, phases: strings as Phase[] };
 }
 
 /**

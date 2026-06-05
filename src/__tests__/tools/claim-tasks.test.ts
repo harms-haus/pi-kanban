@@ -2,8 +2,8 @@ import { describe, it, expect, beforeEach } from "vitest";
 import type { Mock } from "vitest";
 import { createClaimTasksTool } from "../../tools/claim-tasks";
 import { resetState, getBoard } from "../../state";
-import { createMockContext } from "../helpers/mock-api";
-import { makeTask, setupBoard, noop, mockSignal } from "../helpers/test-board";
+import { createMockContext, createMockTheme } from "../helpers/mock-api";
+import { makeTask, setupBoard, noop, mockSignal } from "../helpers/test-helpers";
 
 const tool = createClaimTasksTool();
 const mockCtx = createMockContext();
@@ -187,6 +187,17 @@ describe("claim_tasks tool", () => {
     expect(payload.total).toBe(2);
     expect(payload.claimed).toBe(1);
     expect(payload.ready).toBe(1);
+  });
+
+  // ── renderCall ──
+
+  it("renderCall returns themed text with tool name and count", () => {
+    const theme = createMockTheme();
+    const result = tool.renderCall!({ count: 3 }, theme, {} as any);
+    expect(result).toBeDefined();
+    const lines = result.render(80);
+    expect(lines.join("\n")).toContain("claim_tasks");
+    expect(lines.join("\n")).toContain("3");
   });
 
   it("details contain board snapshot", async () => {

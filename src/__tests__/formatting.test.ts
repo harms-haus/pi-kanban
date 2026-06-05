@@ -8,7 +8,7 @@ import {
   renderBoard,
   renderToolResult,
 } from "../formatting";
-import { makeTask, makeBoard } from "./helpers/test-data";
+import { makeTask, makeBoard } from "./helpers/test-helpers";
 import { createMockTheme } from "./helpers/mock-api";
 import { PHASE_ICONS } from "../types";
 
