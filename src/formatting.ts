@@ -167,26 +167,41 @@ export function renderBoard(board: KanbanBoard, theme: Theme): string {
  * Falls back to plain content text if no details are available.
  */
 export function renderToolResult(
-  result: { content: Array<{ type: string; text?: string }>; details?: unknown },
+  result: { content: Array<{ type: string; text?: string }>; details?: unknown; isError?: boolean },
   _options: { expanded: boolean; isPartial: boolean },
   theme: Theme,
   _context: unknown,
 ): Text {
+  // 1. isError flag from agent-loop error catch
+  if (result.isError) {
+    const text = result.content[0]?.text ?? "Unknown error";
+    return new Text(theme.fg("error", text), 0, 0);
+  }
+
   const details = result.details as KanbanDetails | undefined;
 
+  // 2. No details at all
   if (!details) {
     const text = result.content[0]?.text ?? "";
     return new Text(text, 0, 0);
   }
 
+  // 3. Explicit error in details
   if (details.error) {
     return new Text(theme.fg("error", `Error: ${details.error}`), 0, 0);
   }
 
+  // 4. Board present — render it
   if (details.board) {
     return new Text(renderBoard(details.board, theme), 0, 0);
   }
 
-  // Board is null (e.g., empty list)
+  // 5. Fallback: show content text if available
+  const contentText = result.content[0]?.text;
+  if (contentText) {
+    return new Text(contentText, 0, 0);
+  }
+
+  // 6. Default: no tasks message
   return new Text(theme.fg("dim", "No tasks on the board."), 0, 0);
 }

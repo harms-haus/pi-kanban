@@ -374,7 +374,7 @@ describe("renderToolResult", () => {
     expect(lines.join("\n")).toContain("Kanban Board");
   });
 
-  it('renders "No tasks" when details.board is null and no error', () => {
+  it("renders content text when details.board is null but content exists", () => {
     const result = {
       content: [{ type: "text", text: "list" }],
       details: {
@@ -382,8 +382,9 @@ describe("renderToolResult", () => {
         board: null,
       },
     };
-    renderToolResult(result, { expanded: false, isPartial: false }, mockTheme, {});
-    expect(mockTheme.fg).toHaveBeenCalledWith("dim", "No tasks on the board.");
+    const rendered = renderToolResult(result, { expanded: false, isPartial: false }, mockTheme, {});
+    const lines = rendered.render(100);
+    expect(lines[0]).toBe("list");
   });
 
   it("handles content element with no text property", () => {
@@ -398,5 +399,44 @@ describe("renderToolResult", () => {
     const rendered = renderToolResult(result, { expanded: false, isPartial: false }, mockTheme, {});
     const lines = rendered.render(100);
     expect(lines).toEqual([]);
+  });
+
+  // ── Error handling (isError flag + empty details edge cases) ──
+
+  it("renders error-styled content text when isError is true", () => {
+    const result = {
+      content: [{ type: "text", text: "Task not found" }],
+      isError: true,
+    };
+    renderToolResult(result, { expanded: false, isPartial: false }, mockTheme, {});
+    expect(mockTheme.fg).toHaveBeenCalledWith("error", "Task not found");
+  });
+
+  it("renders 'Unknown error' when isError is true with no content text", () => {
+    const result = {
+      content: [{ type: "text" }],
+      isError: true,
+    };
+    renderToolResult(result, { expanded: false, isPartial: false }, mockTheme, {});
+    expect(mockTheme.fg).toHaveBeenCalledWith("error", "Unknown error");
+  });
+
+  it("renders content text when details is empty object with content", () => {
+    const result = {
+      content: [{ type: "text", text: "Something went wrong" }],
+      details: {},
+    };
+    const rendered = renderToolResult(result, { expanded: false, isPartial: false }, mockTheme, {});
+    const lines = rendered.render(100);
+    expect(lines[0]).toBe("Something went wrong");
+  });
+
+  it('renders "No tasks on the board." when details is empty object with no content', () => {
+    const result = {
+      content: [{ type: "text" }],
+      details: {},
+    };
+    renderToolResult(result, { expanded: false, isPartial: false }, mockTheme, {});
+    expect(mockTheme.fg).toHaveBeenCalledWith("dim", "No tasks on the board.");
   });
 });
