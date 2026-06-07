@@ -16,12 +16,3 @@ export function requireBoard(): KanbanBoard {
   }
   return b;
 }
-
-/** Throws if a board already exists. */
-export function requireNoBoard(): void {
-  if (getBoard() !== null) {
-    throw new Error(
-      "Board already exists. Use advance_tasks/reject_tasks to modify tasks, or write_kanban with append/edit/delete modes.",
-    );
-  }
-}

@@ -22,9 +22,14 @@ export function setBoard(newBoard: KanbanBoard): void {
   board = newBoard;
 }
 
-/** Resets all mutable state. For testing only. */
-export function resetState(): void {
+/** Clears the board, setting it to null. Used when all tasks are deleted. */
+export function clearBoard(): void {
   board = null;
+}
+
+/** Resets all mutable state. Called on session shutdown and in tests. */
+export function resetState(): void {
+  clearBoard();
 }
 
 // ── Task Lookup Helpers ──

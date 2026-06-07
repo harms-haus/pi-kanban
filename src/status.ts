@@ -8,6 +8,10 @@ import type { ExtensionContext } from "@earendil-works/pi-coding-agent";
 import type { KanbanBoard } from "./types";
 import { formatPhaseLabel } from "./formatting";
 
+// ── Constants ──
+
+const STATUS_CHANNEL = "kanban" as const;
+
 // ── Types ──
 
 export interface KanbanStatusPayload {
@@ -71,5 +75,19 @@ export function publishKanbanStatus(board: KanbanBoard, ctx: ExtensionContext): 
     claimedTasks,
   };
 
-  ctx.ui.setStatus("kanban", JSON.stringify(payload));
+  ctx.ui.setStatus(STATUS_CHANNEL, JSON.stringify(payload));
+}
+
+/** Publishes an empty board status to the UI. */
+export function publishEmptyStatus(ctx: ExtensionContext): void {
+  if (!ctx.hasUI) return;
+  const payload: KanbanStatusPayload = {
+    total: 0,
+    claimed: 0,
+    ready: 0,
+    blocked: 0,
+    done: 0,
+    claimedTasks: [],
+  };
+  ctx.ui.setStatus(STATUS_CHANNEL, JSON.stringify(payload));
 }

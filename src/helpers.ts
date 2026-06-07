@@ -6,7 +6,7 @@
 
 import type { AgentToolResult, ExtensionContext } from "@earendil-works/pi-coding-agent";
 import type { KanbanBoard, KanbanDetails } from "./types";
-import { publishKanbanStatus } from "./status";
+import { publishKanbanStatus, publishEmptyStatus } from "./status";
 import { cloneBoard } from "./validation";
 
 // ── Deduplication ─────────────────────────────────────────────────────
@@ -31,14 +31,18 @@ export function deduplicateBy<T>(items: T[], keyFn: (item: T) => string): T[] {
  * Finalizes a board mutation by publishing status and returning a tool result.
  */
 export function finishMutation(
-  board: KanbanBoard,
+  board: KanbanBoard | null,
   ctx: ExtensionContext,
   action: KanbanDetails["action"],
   contentText: string,
 ): AgentToolResult<KanbanDetails> {
-  publishKanbanStatus(board, ctx);
+  if (board) {
+    publishKanbanStatus(board, ctx);
+  } else {
+    publishEmptyStatus(ctx);
+  }
   return {
     content: [{ type: "text" as const, text: contentText }],
-    details: { action, board: cloneBoard(board) },
+    details: { action, board: board ? cloneBoard(board) : null },
   };
 }

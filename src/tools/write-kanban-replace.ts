@@ -1,7 +1,7 @@
 /**
  * write_kanban — replace mode
  *
- * Creates a new kanban board. Errors if one already exists.
+ * Creates a new kanban board, overwriting any existing one.
  */
 
 import type { ExtensionContext, AgentToolResult } from "@earendil-works/pi-coding-agent";
@@ -14,7 +14,6 @@ import { validatePhases, detectCycles } from "../validation";
 import { loadSettings } from "../settings";
 import { formatBoardText } from "../formatting";
 import { finishMutation } from "../helpers";
-import { requireNoBoard } from "../guard";
 
 // ── Types ──
 
@@ -102,28 +101,25 @@ export async function executeReplace(
   },
   ctx: ExtensionContext,
 ): Promise<AgentToolResult<KanbanDetails>> {
-  // 1. Check that no board already exists
-  requireNoBoard();
-
-  // 2. Merge profileMaps and load settings
+  // 1. Merge profileMaps and load settings
   const { profileMap, maxClaims } = await mergeProfileMap(ctx.cwd, params.profileMap);
 
-  // 3. Build tasks with IDs starting at 1
+  // 2. Build tasks with IDs starting at 1
   const tasks = buildTasks(params.tasks, 1);
 
-  // 4. Resolve blocked-by titles → IDs
+  // 3. Resolve blocked-by titles → IDs
   const resolveResult = resolveBlockedByTitles(tasks);
   if (!resolveResult.success) {
     throw new Error(resolveResult.error);
   }
 
-  // 5. Cycle detection
+  // 4. Cycle detection
   const cycleError = detectCycles(tasks);
   if (cycleError) {
     throw new Error(cycleError);
   }
 
-  // 6. Create board
+  // 5. Create board
   const board: KanbanBoard = {
     tasks,
     profileMap,
@@ -132,15 +128,15 @@ export async function executeReplace(
     nextId: tasks.length + 1,
   };
 
-  // 7. Compute initial statuses
+  // 6. Compute initial statuses
   recomputeStatuses(board);
 
-  // 8. Resolve profiles
+  // 7. Resolve profiles
   for (const task of board.tasks) {
     task.profile = resolveTaskProfile(task, profileMap);
   }
 
-  // 9. Persist
+  // 8. Persist
   setBoard(board);
 
   return finishMutation(

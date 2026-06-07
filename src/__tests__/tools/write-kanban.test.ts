@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach } from "vitest";
+import { describe, it, expect, beforeEach, vi } from "vitest";
 import type { Mock } from "vitest";
 import { writeKanbanTool } from "../../tools/write-kanban";
 import { resetState, getBoard } from "../../state";
@@ -117,12 +117,58 @@ describe("write_kanban — replace mode", () => {
     expect(board.tasks.find((t) => t.title === "Implement")!.status).toBe("blocked");
   });
 
-  it("throws if board already exists", async () => {
+  it("replace overwrites existing board", async () => {
     await replace([{ title: "Task A", description: "First" }]);
 
-    await expect(replace([{ title: "Task B", description: "Second" }])).rejects.toThrow(
-      "Board already exists",
-    );
+    // Second replace should succeed and fully reset the board
+    await replace([{ title: "Task B", description: "Second" }]);
+
+    const board = getBoard()!;
+    expect(board.tasks).toHaveLength(1);
+    expect(board.tasks[0]!.title).toBe("Task B");
+  });
+
+  it("replace works after deleting all tasks", async () => {
+    await replace([
+      { title: "Task A", description: "First" },
+      { title: "Task B", description: "Second" },
+      { title: "Task C", description: "Third" },
+    ]);
+
+    // Delete all tasks — board should be null
+    await del(["kb-1", "kb-2", "kb-3"]);
+    expect(getBoard()).toBeNull();
+
+    // Replace should create a fresh board
+    await replace([{ title: "Fresh", description: "New start" }]);
+
+    const board = getBoard()!;
+    expect(board.tasks).toHaveLength(1);
+    expect(board.tasks[0]!.id).toBe("kb-1");
+    expect(board.tasks[0]!.title).toBe("Fresh");
+  });
+
+  it("replace resets all metadata", async () => {
+    // First replace with a custom profileMap
+    await replace([{ title: "A", description: "First" }], { implement: "custom-worker" });
+
+    const firstCreatedAt = getBoard()!.createdAt;
+
+    // Ensure next timestamp is distinct (avoid same-millisecond flake)
+    const mockNow = vi.spyOn(Date, "now").mockReturnValue(firstCreatedAt + 1);
+
+    // Second replace with a different profileMap
+    await replace([{ title: "B", description: "Second" }], { implement: "different-worker" });
+
+    mockNow.mockRestore();
+
+    const board = getBoard()!;
+    // profileMap should reflect the second replace's values
+    expect(board.profileMap.implement).toBe("different-worker");
+    // createdAt should be a fresh timestamp (strictly greater)
+    expect(board.createdAt).toBeGreaterThan(firstCreatedAt);
+    // nextId should reflect only the new tasks
+    expect(board.nextId).toBe(2);
   });
 
   it("throws for invalid phases", async () => {
@@ -768,6 +814,46 @@ describe("write_kanban — delete mode", () => {
 
     const payload = JSON.parse((ctxWithUI.ui.setStatus as Mock).mock.calls[0]![1] as string);
     expect(payload.total).toBe(2);
+  });
+
+  it("deleting the only task on a single-task board clears the board", async () => {
+    resetState();
+    await replace([{ title: "Solo", description: "Only task" }]);
+    const result = await del(["kb-1"]);
+    expect(getBoard()).toBeNull();
+    expect(result.content[0]).toMatchObject({
+      type: "text",
+      text: expect.stringContaining("Board cleared"),
+    });
+  });
+
+  it("deleting all tasks clears the board completely", async () => {
+    const result = await del(["kb-1", "kb-2", "kb-3"]);
+
+    expect(result.content[0]).toMatchObject({
+      type: "text",
+      text: expect.stringContaining("Board cleared"),
+    });
+
+    expect(getBoard()).toBeNull();
+  });
+
+  it("deleting all tasks publishes empty status to UI", async () => {
+    const ctxWithUI = createMockContext({ hasUI: true });
+
+    await tool.execute(
+      "call-1",
+      { mode: "delete", ids: ["kb-1", "kb-2", "kb-3"] },
+      mockSignal,
+      noop,
+      ctxWithUI,
+    );
+
+    expect(ctxWithUI.ui.setStatus).toHaveBeenCalledOnce();
+    expect(ctxWithUI.ui.setStatus).toHaveBeenCalledWith("kanban", expect.any(String));
+
+    const payload = JSON.parse((ctxWithUI.ui.setStatus as Mock).mock.calls[0]![1] as string);
+    expect(payload.total).toBe(0);
   });
 });
 

@@ -6,7 +6,7 @@
 
 import type { ExtensionContext, AgentToolResult } from "@earendil-works/pi-coding-agent";
 import type { KanbanDetails } from "../types";
-import { recomputeStatuses } from "../state";
+import { clearBoard, recomputeStatuses } from "../state";
 import { formatBoardText } from "../formatting";
 import { deduplicateIds, finishMutation } from "../helpers";
 import { requireBoard } from "../guard";
@@ -47,10 +47,21 @@ export function executeDelete(
     task.blockedBy = task.blockedBy.filter((depId) => !deletedSet.has(depId));
   }
 
-  // 6. Recompute statuses
+  // 6. Check if board is now empty
+  if (board.tasks.length === 0) {
+    clearBoard();
+    return finishMutation(
+      null,
+      ctx,
+      "write",
+      `Deleted ${uniqueIds.length} task(s). Board cleared.`,
+    );
+  }
+
+  // 7. Recompute statuses
   recomputeStatuses(board);
 
-  // 7. Return result
+  // 8. Return result
   return finishMutation(
     board,
     ctx,

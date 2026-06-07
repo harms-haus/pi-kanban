@@ -68,7 +68,7 @@ const EditEntrySchema = Type.Object({
 const WriteKanbanParams = Type.Object({
   mode: StringEnum(["replace", "append", "edit", "delete"], {
     description:
-      "replace: Create a new board (errors if one already exists). append: Add tasks to an existing board. edit: Modify existing tasks. delete: Remove tasks by ID.",
+      "replace: Create a new board (overwrites any existing board). append: Add tasks to an existing board. edit: Modify existing tasks. delete: Remove tasks by ID.",
   }),
   tasks: Type.Optional(
     Type.Array(TaskInputSchema, {
@@ -104,7 +104,7 @@ export function writeKanbanTool(): ToolDefinition<typeof WriteKanbanParams, Kanb
     description:
       "Create or modify a kanban board with tasks organized by phases (test, implement, review) with dependency tracking.\n\n" +
       "Four modes:\n" +
-      "- replace: Create a new board (errors if one already exists)\n" +
+      "- replace: Create a new board (overwrites any existing board)\n" +
       "- append: Add tasks to an existing board\n" +
       "- edit: Modify existing tasks (title, description, files, phases, blockedBy)\n" +
       "- delete: Remove tasks by ID",
